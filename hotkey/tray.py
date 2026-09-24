@@ -11,7 +11,7 @@ from typing import Callable
 import pystray
 from PIL import Image, ImageDraw, ImageFont
 
-from core.config import TONES
+from core.config import MODEL_PRESETS, TONES
 
 TONE_LABELS = {"formal": "ทางการ", "friendly": "เป็นกันเอง", "brief": "สั้น"}
 
@@ -53,8 +53,12 @@ class Tray:
         get_autostart: Callable[[], bool] = lambda: False,
         toggle_autostart: Callable[[], None] = lambda: None,
         get_hotkeys: Callable[[], str] = lambda: "",
+        get_preset: Callable[[], str] = lambda: "auto",
+        set_preset: Callable[[str], None] = lambda _key: None,
     ):
         self._get_hotkeys = get_hotkeys
+        self._get_preset = get_preset
+        self._set_preset = set_preset
         self._get_status = get_status
         self._get_tone = get_tone
         self._set_tone = set_tone
@@ -83,6 +87,14 @@ class Tray:
                 radio=True,
             )
 
+        def preset_item(key: str):
+            return pystray.MenuItem(
+                MODEL_PRESETS[key][0],
+                lambda: self._set_preset(key),
+                checked=lambda _item, k=key: self._get_preset() == k,
+                radio=True,
+            )
+
         return pystray.Menu(
             # default=True -> คลิกซ้ายที่ไอคอนจะเรียกรายการนี้
             pystray.MenuItem(
@@ -98,6 +110,7 @@ class Tray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("ตั้งค่า: คีย์ / ปุ่มลัด / บัญชี...", lambda: self._open_settings()),
             pystray.MenuItem("น้ำเสียงตอนตอบ", pystray.Menu(*[tone_item(t) for t in TONES])),
+            pystray.MenuItem("โมเดลแปล", pystray.Menu(*[preset_item(k) for k in MODEL_PRESETS])),
             pystray.MenuItem(
                 lambda _i: "Discord app: กำลังทำงาน (คลิกเพื่อปิด)" if self._get_discord_running()
                 else "Discord app: ปิดอยู่ (คลิกเพื่อเปิด)",

@@ -27,7 +27,7 @@ if _ROOT not in sys.path:
 
 import keyboard  # noqa: E402
 
-from core.config import MODES, load_config  # noqa: E402
+from core.config import MODEL_PRESETS, MODES, apply_preset, current_preset, load_config  # noqa: E402
 from core.providers import ProviderError  # noqa: E402
 from core.translator import Result, Translator  # noqa: E402
 from hotkey import autostart  # noqa: E402
@@ -37,6 +37,10 @@ from hotkey.settings_dialog import SettingsDialog  # noqa: E402
 from hotkey.tray import Tray  # noqa: E402
 
 log = logging.getLogger("hotkey")
+
+# ช่องพิมพ์ Discord รับได้สูงสุด 4000 ตัวอักษร (Nitro) ถ้าก๊อปมาได้ยาวกว่านี้
+# แปลว่าไม่ได้ก๊อปจากช่องพิมพ์ แต่ไปโดนข้อความทั้งหน้าจอ ห้ามเอาไปแปลแล้ววางทับ
+MAX_DRAFT_CHARS = 4000
 
 
 class App:
@@ -69,6 +73,8 @@ class App:
             get_autostart=lambda: self._autostart_state,
             toggle_autostart=lambda: self.ui(self._toggle_autostart),
             get_hotkeys=self._hotkeys_text,
+            get_preset=self._get_preset,
+            set_preset=lambda key: self.ui(self._set_preset, key),
         )
         self._autostart_state = autostart.is_enabled()
         self.discord_proc: subprocess.Popen | None = None
@@ -213,18 +219,37 @@ class App:
                     previous_clip = None
                     self.toast("ช่องพิมพ์ว่าง (คลิกในช่องพิมพ์แล้วพิมพ์ข้อความก่อน)")
                     return
-
-            self.toast("กำลังแปล...", seconds=0)
-            result = self.translator.run(mode, text, tone=self.tone)
-            log.info("%s via %s/%s in %.1fs", mode, result.provider, result.model, result.seconds)
+                if len(text) > MAX_DRAFT_CHARS:
+                    clip.restore_clipboard(previous_clip)
+                    previous_clip = None
+                    self.toast(f"ได้ข้อความมา {len(text):,} ตัวอักษร ยาวเกินช่องพิมพ์ "
+                               "น่าจะโฟกัสไม่ได้อยู่ในช่องพิมพ์ (คลิกในช่องพิมพ์ก่อนแล้วกดใหม่)", seconds=5)
+                    return
 
             if mode in ("reply", "polish"):
+                self.toast("กำลังแปล...", seconds=0)
+                result = self.translator.run(mode, text, tone=self.tone)
+                log.info("%s via %s/%s in %.1fs", mode, result.provider, result.model, result.seconds)
                 clip.paste_replace(result.text, previous_clip or "")
                 previous_clip = None
                 self.ui(self._show_popup, result, text, False)
                 self._auto_check(result)
             else:
-                self.ui(self._show_popup, result, text, True)
+                # เปิดป๊อปอัปทันที แล้วทยอยเติมคำแปลระหว่างที่โมเดลกำลังพิมพ์ ไม่ต้องรอจนจบ
+                stream_id = object()
+                pending = Result("", mode, self.tone, "", "", 0.0, False)
+                self.ui(self._show_popup, pending, text, True, stream_id, True)
+                try:
+                    result = self.translator.run(
+                        mode, text, tone=self.tone,
+                        on_delta=lambda chunk: self.ui(self._append_popup, stream_id, chunk),
+                        on_reset=lambda: self.ui(self._reset_popup, stream_id),
+                    )
+                except Exception:
+                    self.ui(self._close_popup, stream_id)
+                    raise
+                log.info("%s via %s/%s in %.1fs", mode, result.provider, result.model, result.seconds)
+                self.ui(self._finish_popup, stream_id, result)
         except ProviderError as e:
             log.warning("translate failed: %s", e)
             self.ui(self._show_error, str(e))
@@ -300,7 +325,8 @@ class App:
         threading.Thread(target=run, daemon=True).start()
 
     # ---------------------------------------------------------------- UI callbacks (tk thread)
-    def _show_popup(self, result: Result, original: str, take_focus: bool) -> None:
+    def _show_popup(self, result: Result, original: str, take_focus: bool,
+                    stream_id: object | None = None, pending: bool = False) -> None:
         if Toast._current:
             Toast._current.close()
         ResultPopup(
@@ -314,7 +340,34 @@ class App:
             on_back_translate=self._back_translate,
             on_copy=self._copy_to_clipboard,
             show_check_placeholder=self.cfg.auto_back_translate,
+            pending=pending,
+            stream_id=stream_id,
         )
+
+    # ป๊อปอัปแบบทยอยเติม: ทุกตัวเช็ค stream_id กันเติมผิดหน้าต่าง (ผู้ใช้อาจกดแปลอันใหม่ไปแล้ว)
+    def _popup_for(self, stream_id: object) -> ResultPopup | None:
+        popup = ResultPopup._current
+        return popup if popup is not None and popup.stream_id is stream_id else None
+
+    def _append_popup(self, stream_id: object, chunk: str) -> None:
+        popup = self._popup_for(stream_id)
+        if popup is not None:
+            popup.append_text(chunk)
+
+    def _reset_popup(self, stream_id: object) -> None:
+        popup = self._popup_for(stream_id)
+        if popup is not None:
+            popup.reset_text()
+
+    def _finish_popup(self, stream_id: object, result: Result) -> None:
+        popup = self._popup_for(stream_id)
+        if popup is not None:  # ถ้าผู้ใช้ปิดไปแล้วระหว่างรอ ก็ไม่ต้องเด้งขึ้นมาใหม่
+            popup.finish(result)
+
+    def _close_popup(self, stream_id: object) -> None:
+        popup = self._popup_for(stream_id)
+        if popup is not None:
+            popup.close()
 
     def _show_error(self, message: str) -> None:
         if Toast._current:
@@ -346,8 +399,24 @@ class App:
         parts = [f"{(self.cfg.hotkey(m) or '-').upper()}={labels[m]}" for m in MODES if self.cfg.hotkey(m)]
         return "ปุ่มลัด: " + "  ".join(parts) if parts else "ปุ่มลัด: ยังไม่ได้ตั้ง"
 
+    # ---------------------------------------------------------------- เลือกโมเดลจากเมนู tray
+    def _get_preset(self) -> str:
+        return current_preset(self.cfg)
+
+    def _set_preset(self, key: str) -> None:
+        try:
+            apply_preset(self.cfg.root, key)
+        except (OSError, KeyError) as e:
+            self._show_error(f"บันทึกโมเดลไม่ได้: {e}")
+            return
+        self._reload(quiet=True)
+        self.toast(f"โมเดลแปล: {MODEL_PRESETS[key][0]}")
+
     def _status_text(self) -> str:
-        return f"ผู้ให้บริการ: {' → '.join(self.cfg.provider_order)}"
+        key = current_preset(self.cfg)
+        if key in MODEL_PRESETS:
+            return f"โมเดลแปล: {MODEL_PRESETS[key][0]}"
+        return f"โมเดลแปล: กำหนดเอง ({' → '.join(self.cfg.provider_order)})"
 
     def _usage_text(self) -> str:
         used = self.translator.usage.today()

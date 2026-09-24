@@ -26,6 +26,20 @@ def _place_near_mouse(win: tk.Toplevel, width: int, height: int) -> None:
     win.geometry(f"{width}x{height}+{x}+{y}")
 
 
+def _height_for(text: str, cap: int = 14) -> int:
+    lines = text.count("\n") + 1 + len(text) // 70
+    return min(cap, max(2, lines))
+
+
+def _title_for(result: Result, pending: bool) -> str:
+    if pending:
+        return f"{MODE_LABELS.get(result.mode, result.mode)}  ·  กำลังแปล..."
+    title = f"{MODE_LABELS.get(result.mode, result.mode)}  ·  {result.provider} / {result.model}  ·  {result.seconds:.1f}s"
+    if result.fallback_used:
+        title += "  (ตัวสำรอง)"
+    return title
+
+
 class Toast:
     """ข้อความเล็กๆ ใกล้เมาส์ หายเองใน N วินาที ไม่แย่งโฟกัส"""
 
@@ -57,7 +71,11 @@ class Toast:
 
 
 class ResultPopup:
-    """หน้าต่างผลแปล: ต้นฉบับ (เทา) + ผลลัพธ์ (ขาว) + ปุ่มก๊อป / เปลี่ยนน้ำเสียง / แปลกลับ / ปิด"""
+    """หน้าต่างผลแปล: ต้นฉบับ (เทา) + ผลลัพธ์ (ขาว) + ปุ่มก๊อป / เปลี่ยนน้ำเสียง / แปลกลับ / ปิด
+
+    เปิดแบบ pending=True ได้ตั้งแต่ยังไม่มีผล แล้วค่อย append_text() ทีละส่วนระหว่างที่โมเดลพิมพ์
+    จบด้วย finish(result) เพื่อใส่ข้อความสุดท้ายและหัวข้อ (ตัวแปล/เวลา)
+    """
 
     _current: "ResultPopup | None" = None
 
@@ -74,13 +92,18 @@ class ResultPopup:
         on_back_translate: Callable[[str], None] | None = None,
         on_copy: Callable[[str], None] | None = None,
         show_check_placeholder: bool = False,
+        pending: bool = False,
+        stream_id: object | None = None,
     ):
         if ResultPopup._current is not None:
             ResultPopup._current.close()
         ResultPopup._current = self
 
         self.result = result
+        self.pending = pending
+        self.stream_id = stream_id
         self.on_copy = on_copy
+        self.auto_close = auto_close
         win = self.win = tk.Toplevel(root)
         win.overrideredirect(True)
         win.attributes("-topmost", True)
@@ -91,13 +114,12 @@ class ResultPopup:
         # ---- แถบหัว (ลากย้ายได้) ----
         header = tk.Frame(win, bg=PANEL)
         header.pack(fill="x")
-        title = f"{MODE_LABELS.get(result.mode, result.mode)}  ·  {result.provider} / {result.model}  ·  {result.seconds:.1f}s"
-        if result.fallback_used:
-            title += "  (ตัวสำรอง)"
-        tk.Label(header, text=title, bg=PANEL, fg=MUTED, font=small, anchor="w", padx=10, pady=4).pack(side="left", fill="x", expand=True)
+        self._title = tk.Label(header, text=_title_for(result, pending), bg=PANEL, fg=MUTED, font=small,
+                               anchor="w", padx=10, pady=4)
+        self._title.pack(side="left", fill="x", expand=True)
         tk.Button(header, text="✕", bg=PANEL, fg=FG, bd=0, font=small, padx=8, activebackground="#c0392b",
                   command=self.close).pack(side="right")
-        for widget in (header, header.winfo_children()[0]):
+        for widget in (header, self._title):
             widget.bind("<ButtonPress-1>", self._drag_start)
             widget.bind("<B1-Motion>", self._drag_move)
 
@@ -113,8 +135,7 @@ class ResultPopup:
         ttk.Separator(body).pack(fill="x", pady=6)
 
         # ---- ผลลัพธ์ ----
-        lines = result.text.count("\n") + 1 + len(result.text) // 70
-        self.out = tk.Text(body, height=min(14, max(2, lines)), wrap="word", bg=BG, fg=FG, font=font,
+        self.out = tk.Text(body, height=_height_for(result.text), wrap="word", bg=BG, fg=FG, font=font,
                            bd=0, padx=4, pady=2, insertbackground=FG)
         self.out.insert("1.0", result.text)
         self.out.pack(fill="both", expand=True)
@@ -138,7 +159,7 @@ class ResultPopup:
                 state = "disabled" if tone == result.tone else "normal"
                 self._button(bar, label, lambda t=tone: on_retone(t), state=state).pack(side="left", padx=(6, 0))
         if result.mode in ("reply", "polish") and on_back_translate:
-            self._button(bar, "แปลกลับเช็ก", lambda: on_back_translate(result.text)).pack(side="left", padx=(6, 0))
+            self._button(bar, "แปลกลับเช็ก", lambda: on_back_translate(self.result.text)).pack(side="left", padx=(6, 0))
         self._button(bar, "ปิด", self.close).pack(side="right")
 
         win.bind("<Escape>", lambda _e: self.close())
@@ -148,7 +169,7 @@ class ResultPopup:
         if take_focus:
             win.focus_force()
             self.out.focus_set()
-        if auto_close > 0:
+        if auto_close > 0 and not pending:
             win.after(int(auto_close * 1000), self.close)
 
     def _button(self, parent, text, command, state="normal"):
@@ -161,6 +182,54 @@ class ResultPopup:
         if self.on_copy:
             self.on_copy(text)
 
+    def _fit(self) -> None:
+        """ปรับความสูงหน้าต่างตามเนื้อหา และเลื่อนขึ้นถ้าจะล้นขอบล่างจอ"""
+        win = self.win
+        win.update_idletasks()
+        width, height = win.winfo_width(), win.winfo_reqheight()
+        x, y = win.winfo_x(), win.winfo_y()
+        limit = win.winfo_screenheight() - 48
+        if y + height > limit:
+            y = max(8, limit - height)
+        win.geometry(f"{width}x{height}+{x}+{y}")
+
+    # ---- streaming ----
+    def append_text(self, delta: str) -> None:
+        """เติมข้อความต่อท้าย (เรียกจากเธรด tkinter) ขยายหน้าต่างตามเมื่อยาวขึ้น"""
+        try:
+            self.out.insert("end", delta)
+            self.out.see("end")
+            height = _height_for(self.out.get("1.0", "end"))
+            if height != int(self.out.cget("height")):
+                self.out.configure(height=height)
+                self._fit()
+        except tk.TclError:
+            pass
+
+    def reset_text(self) -> None:
+        """ล้างข้อความที่ทยอยมา (ตัวแปลแรกล้มกลางทาง กำลังเปลี่ยนตัว)"""
+        try:
+            self.out.delete("1.0", "end")
+            self.out.configure(height=2)
+            self._fit()
+        except tk.TclError:
+            pass
+
+    def finish(self, result: Result) -> None:
+        """ใส่ผลสุดท้าย: ข้อความเต็ม + หัวข้อ (ตัวแปล/รุ่น/เวลา)"""
+        self.result = result
+        self.pending = False
+        try:
+            self._title.configure(text=_title_for(result, False))
+            self.out.delete("1.0", "end")
+            self.out.insert("1.0", result.text)
+            self.out.configure(height=_height_for(result.text))
+            self._fit()
+            if self.auto_close > 0:
+                self.win.after(int(self.auto_close * 1000), self.close)
+        except tk.TclError:
+            pass
+
     def set_check(self, text: str) -> None:
         """ใส่ผลแปลกลับ (เรียกจากเธรด tkinter)"""
         if self.check is None:
@@ -171,8 +240,7 @@ class ResultPopup:
             self.check.insert("1.0", text)
             lines = text.count("\n") + 1 + len(text) // 80
             self.check.configure(height=min(6, max(2, lines)), state="disabled")
-            self.win.update_idletasks()
-            self.win.geometry(f"{self.win.winfo_width()}x{self.win.winfo_reqheight()}")
+            self._fit()
         except tk.TclError:
             pass
 

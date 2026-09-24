@@ -14,10 +14,12 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from typing import Callable
 
-from core.providers.base import Provider, ProviderError
+from core.providers.base import Provider, ProviderCancelled, ProviderError
 
 log = logging.getLogger("claude_code")
 
@@ -118,20 +120,7 @@ class ClaudeCodeProvider(Provider):
         if not self.command:
             raise ProviderError("ไม่พบ Claude Code CLI (ตั้งค่า providers.claude_code.command หรือติดตั้ง claude)")
 
-        args = [
-            *self.command,
-            "-p",
-            *(FAST_START_ARGS if self.fast_start else []),
-            "--tools", "",
-            "--no-session-persistence",
-            "--output-format", "json",
-            "--model", model_alias,
-            "--system-prompt", system,
-        ]
-        if self.effort:
-            args += ["--effort", self.effort]
-        args += self.extra_args
-        args.append(user)
+        args = self._args(system, user, model_alias, streaming=False)
 
         creationflags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
         env = dict(os.environ, PYTHONIOENCODING="utf-8")
@@ -160,6 +149,113 @@ class ClaudeCodeProvider(Provider):
         log.info("model=%s wall=%.1fs api=%.1fs startup=%.1fs", model_alias, wall, api, wall - api)
         return result
 
+    def _args(self, system: str, user: str, model_alias: str, streaming: bool) -> list[str]:
+        args = [*self.command, "-p", *(FAST_START_ARGS if self.fast_start else []),
+                "--tools", "", "--no-session-persistence"]
+        if streaming:
+            # stream-json ต้องคู่กับ --verbose ส่วน --include-partial-messages = ส่งข้อความทีละชิ้นระหว่างพิมพ์
+            args += ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
+        else:
+            args += ["--output-format", "json"]
+        args += ["--model", model_alias, "--system-prompt", system]
+        if self.effort:
+            args += ["--effort", self.effort]
+        args += self.extra_args
+        args.append(user)
+        return args
+
+    def stream(
+        self,
+        system: str,
+        user: str,
+        model_alias: str,
+        on_delta: Callable[[str], None] | None = None,
+        cancel: threading.Event | None = None,
+    ) -> str:
+        """เหมือน complete() แต่ทยอยส่งข้อความผ่าน on_delta ตั้งแต่คำแรก (ก่อนบูตเสร็จ ~1.5 วิ)"""
+        if not self.command:
+            raise ProviderError("ไม่พบ Claude Code CLI (ตั้งค่า providers.claude_code.command หรือติดตั้ง claude)")
+
+        creationflags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        started = time.perf_counter()
+        try:
+            proc = subprocess.Popen(
+                self._args(system, user, model_alias, streaming=True),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # รวมกับ stdout กัน pipe ตัน (บรรทัดที่ไม่ใช่ JSON ถูกกรองทิ้ง)
+                stdin=subprocess.DEVNULL,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+                creationflags=creationflags,
+                env=env,
+            )
+        except OSError as e:
+            raise ProviderError(f"รัน Claude Code ไม่ได้: {e}") from e
+
+        timed_out = threading.Event()
+
+        def on_timeout() -> None:
+            timed_out.set()
+            proc.kill()
+
+        timer = threading.Timer(self.config.timeout, on_timeout)
+        timer.daemon = True
+        timer.start()
+        if cancel is not None:
+            def watch_cancel() -> None:  # ถูกยกเลิก (อีกเจ้าตอบก่อน) -> ฆ่า process ทันที
+                while proc.poll() is None:
+                    if cancel.wait(0.1):
+                        proc.kill()
+                        return
+
+            threading.Thread(target=watch_cancel, daemon=True).start()
+
+        parts: list[str] = []
+        data: dict = {}
+        noise: list[str] = []  # บรรทัดที่ไม่ใช่ JSON เก็บไว้โชว์ตอน error
+        try:
+            for line in proc.stdout:
+                line = line.strip()
+                if not line.startswith("{"):
+                    if line:
+                        noise = (noise + [line])[-5:]
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                kind = event.get("type")
+                if kind == "stream_event":
+                    inner = event.get("event", {})
+                    if inner.get("type") == "content_block_delta":
+                        delta = inner.get("delta", {})
+                        chunk = delta.get("text", "") if delta.get("type") == "text_delta" else ""
+                        if chunk:
+                            parts.append(chunk)
+                            if on_delta is not None:
+                                on_delta(chunk)
+                elif kind == "result":
+                    data = event
+            proc.wait()
+        finally:
+            timer.cancel()
+
+        if cancel is not None and cancel.is_set():
+            raise ProviderCancelled("ยกเลิก")
+        if timed_out.is_set():
+            raise ProviderError(f"Claude Code ไม่ตอบภายใน {self.config.timeout:.0f} วินาที")
+        stderr = "\n".join(noise)
+        if not data:
+            raise ProviderError(f"Claude Code ตอบไม่เป็น JSON (exit {proc.returncode}): {(stderr or 'ไม่มีผลลัพธ์')[:300]}")
+        result = _result_from_data(data, stderr, "".join(parts).strip())
+        wall = time.perf_counter() - started
+        api = float(data.get("duration_api_ms") or 0) / 1000
+        log.info("model=%s wall=%.1fs api=%.1fs startup=%.1fs", model_alias, wall, api, wall - api)
+        return result
+
 
 def _parse_output(stdout: str, stderr: str, returncode: int) -> tuple[str, dict]:
     text = (stdout or "").strip()
@@ -180,12 +276,19 @@ def _parse_output(stdout: str, stderr: str, returncode: int) -> tuple[str, dict]
     if data is None:
         msg = (stderr or text or "ไม่มีผลลัพธ์").strip()
         raise ProviderError(f"Claude Code ตอบไม่เป็น JSON (exit {returncode}): {msg[:300]}")
+    return _result_from_data(data, stderr), data
 
+
+def _result_from_data(data: dict, stderr: str, streamed: str = "") -> str:
+    """ดึงข้อความจากก้อน result ของ claude (ถ้าว่างใช้ที่ stream มา) แปลง error เป็น ProviderError ภาษาไทย"""
     result = str(data.get("result", "")).strip()
-    if data.get("is_error") or not result:
+    if data.get("is_error"):
         if "login" in result.lower():
             raise ProviderError(
                 "Claude Code ยังไม่ได้ล็อกอิน: เปิด PowerShell แล้วรันคำสั่ง claude จากนั้นพิมพ์ /login หนึ่งครั้ง"
             )
         raise ProviderError(f"Claude Code แจ้งข้อผิดพลาด: {result or stderr.strip()[:300]}")
-    return result, data
+    result = result or streamed
+    if not result:
+        raise ProviderError(f"Claude Code แจ้งข้อผิดพลาด: {stderr.strip()[:300] or 'ไม่มีผลลัพธ์'}")
+    return result

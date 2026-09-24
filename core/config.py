@@ -18,6 +18,15 @@ MODEL_ALIASES = {
 TONES = ("formal", "friendly", "brief")
 MODES = ("read", "reply", "explain", "polish")
 
+# ชุดโมเดลให้เลือกจากเมนู tray: key -> (ชื่อในเมนู, provider_order, ชื่อย่อรุ่น Claude ที่จะตั้งให้ทุกโหมด หรือ None = ไม่แตะ)
+# ตัวเลข ~วินาที มาจากการวัดจริงกับอีเมล 600 ตัวอักษร (โหมดแปลเป็นไทย)
+MODEL_PRESETS: dict[str, tuple[str, list[str], str | None]] = {
+    "auto": ("อัตโนมัติ: Gemini ก่อน, Claude Sonnet สำรอง (แนะนำ)", ["gemini", "claude_code"], None),
+    "gemini": ("Gemini flash-lite อย่างเดียว (เร็วสุด ~4 วิ)", ["gemini"], None),
+    "sonnet": ("Claude Sonnet อย่างเดียว (แม่นกว่า ~9 วิ)", ["claude_code"], "sonnet"),
+    "opus": ("Claude Opus อย่างเดียว (ดีสุด ~9 วิ กินโควต้ามาก)", ["claude_code"], "opus"),
+}
+
 
 @dataclass
 class Config:
@@ -44,6 +53,11 @@ class Config:
     @property
     def auto_back_translate(self) -> bool:
         return bool(self.raw.get("general", {}).get("auto_back_translate", True))
+
+    @property
+    def hedge_after_seconds(self) -> float:
+        """ตัวหลักยังไม่ส่งคำแรกภายในกี่วินาที ให้ปล่อยตัวสำรองวิ่งคู่ (0 = ยิงพร้อมกันเลย, ติดลบ = ไม่ต้อง)"""
+        return float(self.raw.get("general", {}).get("hedge_after_seconds", 3.0))
 
     def model_for(self, mode: str) -> str:
         """ชื่อรุ่นโมเดล (ชื่อย่อ) สำหรับโหมดนั้น"""
@@ -154,3 +168,22 @@ def load_config(root: Path | None = None) -> Config:
     glossary_path = root / "glossary.md"
     glossary = glossary_path.read_text(encoding="utf-8") if glossary_path.exists() else ""
     return Config(raw=raw, root=root, glossary=glossary, env=_load_env(root / ".env"))
+
+
+def current_preset(cfg: Config) -> str:
+    """key ของ MODEL_PRESETS ที่ตรงกับ config ตอนนี้ หรือ "custom" ถ้าผู้ใช้ตั้งเองใน config.toml"""
+    order = cfg.provider_order
+    aliases = {cfg.model_for(m) for m in MODES}
+    for key, (_label, preset_order, alias) in MODEL_PRESETS.items():
+        if order == preset_order and (alias is None or aliases == {alias}):
+            return key
+    return "custom"
+
+
+def apply_preset(root: Path, key: str) -> None:
+    """บันทึกชุดโมเดลที่เลือกลง config.toml (provider_order และรุ่น Claude ของทุกโหมด)"""
+    _label, order, alias = MODEL_PRESETS[key]
+    set_config_value(root, "general", "provider_order", order)
+    if alias:
+        for mode in MODES:
+            set_config_value(root, "modes", mode, alias)
