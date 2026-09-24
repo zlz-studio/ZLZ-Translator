@@ -40,6 +40,24 @@ FAST_START_ARGS = [
 ]
 
 
+# สคริปต์ครอบของ npm (claude.cmd / claude.ps1) ต้องรันผ่าน cmd.exe หรือ powershell
+# ซึ่ง "ตัดบรรทัดคำสั่งทิ้งตรงตัวขึ้นบรรทัดใหม่" ทำให้ --system-prompt และ prompt ที่มีหลายบรรทัด
+# หายไปกลางทาง (claude แจ้งว่า "Input must be provided...") จึงต้องเรียก claude.exe ตรง ๆ เสมอ
+_SHIM_SUFFIXES = {".cmd", ".bat", ".ps1"}
+
+
+def resolve_shim(path: str) -> str:
+    """ถ้า path เป็นสคริปต์ครอบของ npm ให้คืน claude.exe ตัวจริงที่มันเรียกอยู่ข้างใน"""
+    p = Path(path)
+    if p.suffix.lower() not in _SHIM_SUFFIXES:
+        return path
+    for real in (p.with_suffix(".exe"),
+                 p.parent / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe"):
+        if real.exists():
+            return str(real)
+    return path
+
+
 def find_claude_command(configured: str = "") -> list[str]:
     """คืนคำสั่งเป็น list (รองรับ 'python fake.py' สำหรับทดสอบ)"""
     env_cmd = os.environ.get("CLAUDE_CODE_COMMAND")  # สำหรับทดสอบ มาก่อน config
@@ -49,17 +67,29 @@ def find_claude_command(configured: str = "") -> list[str]:
         parts = shlex.split(configured, posix=False)
         parts[0] = parts[0].strip('"')
         # พาธที่ระบุไว้อาจเป็นของเครื่องอื่น (เช่น ส่งโปรเจกต์ให้เพื่อน) ถ้าไม่มีไฟล์ให้หาอัตโนมัติแทน
-        if os.path.exists(parts[0]) or shutil.which(parts[0]):
+        found = parts[0] if os.path.exists(parts[0]) else shutil.which(parts[0])
+        if found:
+            parts[0] = resolve_shim(found)
             return parts
+
     on_path = shutil.which("claude")
-    if on_path:
-        return [on_path]
+    resolved = resolve_shim(on_path) if on_path else ""
+    # ได้ .exe ตัวจริงจาก PATH แล้ว ใช้ได้เลย
+    if resolved and Path(resolved).suffix.lower() == ".exe":
+        return [resolved]
+
+    # ไม่งั้นลองหาไบนารีที่ติดมากับแอป Claude Desktop
     candidates: list[str] = []
     for pattern in _DESKTOP_GLOBS:
         candidates.extend(glob.glob(pattern))
     candidates = sorted(set(candidates), key=_version_key)
     if candidates:
         return [candidates[-1]]
+
+    # เหลือแค่สคริปต์ครอบ ก็ยังดีกว่าไม่มีอะไรเลย (prompt หลายบรรทัดจะใช้ไม่ได้)
+    if on_path:
+        log.warning("ใช้ %s ได้อย่างเดียว prompt หลายบรรทัดอาจส่งไม่ถึง", on_path)
+        return [on_path]
     return []
 
 
@@ -116,6 +146,8 @@ class ClaudeCodeProvider(Provider):
                 timeout=self.config.timeout,
                 creationflags=creationflags,
                 env=env,
+                # ไม่ปิด stdin claude จะรอข้อมูลจาก stdin 3 วินาทีก่อนทุกครั้ง
+                stdin=subprocess.DEVNULL,
             )
         except subprocess.TimeoutExpired as e:
             raise ProviderError(f"Claude Code ไม่ตอบภายใน {self.config.timeout:.0f} วินาที") from e
