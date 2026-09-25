@@ -302,13 +302,17 @@ class App:
             try:
                 back = self.translator.run("read", result.text)
                 text = back.text
+                log.info("auto-check via %s/%s in %.1fs", back.provider, back.model, back.seconds)
             except ProviderError as e:
+                log.warning("auto-check failed: %s", e)
                 text = f"(แปลกลับไม่สำเร็จ: {e})"
 
             def apply():
                 popup = ResultPopup._current
                 if popup is not None and popup.result is result:
                     popup.set_check(text)
+                else:
+                    log.info("auto-check: ป๊อปอัปถูกปิดไปก่อนผลแปลกลับมาถึง")
 
             self.ui(apply)
 
