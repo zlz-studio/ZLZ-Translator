@@ -9,7 +9,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-SHORTCUT_NAME = "Discord Translator.lnk"
+from core.config import APP_NAME, is_frozen
+
+SHORTCUT_NAME = f"{APP_NAME}.lnk"
+_OLD_SHORTCUT_NAMES = ("Discord Translator.lnk",)  # ชื่อเก่า ยังลบ/ตรวจให้ได้
 _NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
 
 
@@ -21,8 +24,12 @@ def shortcut_path() -> Path:
     return startup_dir() / SHORTCUT_NAME
 
 
+def _all_shortcut_paths() -> list[Path]:
+    return [shortcut_path(), *(startup_dir() / n for n in _OLD_SHORTCUT_NAMES)]
+
+
 def is_enabled() -> bool:
-    return shortcut_path().exists()
+    return any(p.exists() for p in _all_shortcut_paths())
 
 
 def _pythonw(root: Path) -> Path:
@@ -31,18 +38,26 @@ def _pythonw(root: Path) -> Path:
 
 
 def enable(root: Path) -> tuple[bool, str]:
-    target = _pythonw(root)
-    app = root / "hotkey" / "app.py"
+    if is_frozen():
+        # ติดตั้งเป็น .exe แล้ว: ชี้ไปที่ตัวโปรแกรมตรง ๆ
+        target = Path(sys.executable)
+        arguments = ""
+        workdir = target.parent
+    else:
+        target = _pythonw(root)
+        arguments = f'"{root / "hotkey" / "app.py"}"'
+        workdir = root
     lnk = shortcut_path()
     script = (
         "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{lnk}'); "
         "$s.TargetPath = '{target}'; "
-        "$s.Arguments = '\"{app}\"'; "
-        "$s.WorkingDirectory = '{root}'; "
-        "$s.Description = 'Discord Translator'; "
+        "$s.Arguments = '{arguments}'; "
+        "$s.WorkingDirectory = '{workdir}'; "
+        "$s.Description = '{name}'; "
         "$s.Save()"
     ).format(lnk=str(lnk).replace("'", "''"), target=str(target).replace("'", "''"),
-             app=str(app).replace("'", "''"), root=str(root).replace("'", "''"))
+             arguments=arguments.replace("'", "''"), workdir=str(workdir).replace("'", "''"),
+             name=APP_NAME.replace("'", "''"))
     try:
         proc = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
                               capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -55,10 +70,10 @@ def enable(root: Path) -> tuple[bool, str]:
 
 
 def disable() -> tuple[bool, str]:
-    lnk = shortcut_path()
     try:
-        if lnk.exists():
-            lnk.unlink()
+        for lnk in _all_shortcut_paths():
+            if lnk.exists():
+                lnk.unlink()
     except OSError as e:
         return False, str(e)
     return True, "ยกเลิกเปิดอัตโนมัติแล้ว"

@@ -2,12 +2,58 @@
 from __future__ import annotations
 
 import os
+import shutil
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+APP_NAME = "ZLZ Translator"
+APP_VERSION = "1.0.0"  # build.bat และตัวติดตั้งอ่านค่านี้
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# ไฟล์ค่าเริ่มต้นที่ต้องมีในโฟลเดอร์ข้อมูลผู้ใช้ (ชื่อในโฟลเดอร์ผู้ใช้ -> ชื่อต้นฉบับใน bundle)
+_DEFAULT_FILES = {"config.toml": "config.toml", "glossary.md": "glossary.md", ".env": ".env.example"}
+
+
+def is_frozen() -> bool:
+    """รันจาก .exe ที่ PyInstaller สร้าง (ไม่ใช่จากซอร์ส)"""
+    return bool(getattr(sys, "frozen", False))
+
+
+def bundle_dir() -> Path:
+    """โฟลเดอร์ที่มีไฟล์ค่าเริ่มต้น: ใน .exe คือโฟลเดอร์ชั่วคราวของ PyInstaller, รันจากซอร์สคือโปรเจกต์"""
+    return Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
+
+
+def user_data_dir() -> Path:
+    """ที่เก็บ config.toml / glossary.md / .env / data ของผู้ใช้
+
+    รันจากซอร์ส = โฟลเดอร์โปรเจกต์ (เหมือนเดิม)  รันจาก .exe = %APPDATA%/ZLZ Translator
+    เพราะโฟลเดอร์ที่ติดตั้งโปรแกรมอาจเขียนไม่ได้ และผู้ใช้ไม่ควรต้องรู้ว่าโปรแกรมติดตั้งอยู่ที่ไหน
+    """
+    override = os.environ.get("TRANSLATOR_ROOT")
+    if override:
+        return Path(override)
+    if is_frozen():
+        base = os.environ.get("APPDATA") or str(Path.home())
+        return Path(base) / APP_NAME
+    return PROJECT_ROOT
+
+
+def ensure_user_files(root: Path) -> None:
+    """สร้างโฟลเดอร์ผู้ใช้และก๊อปไฟล์ค่าเริ่มต้นที่ยังไม่มี (ไม่ทับของเดิม)"""
+    src_dir = bundle_dir()
+    if root.resolve() == src_dir.resolve():
+        return
+    root.mkdir(parents=True, exist_ok=True)
+    for name, source in _DEFAULT_FILES.items():
+        target = root / name
+        src = src_dir / source
+        if not target.exists() and src.exists():
+            shutil.copyfile(src, target)
 
 MODEL_ALIASES = {
     "haiku": "claude-haiku-4-5",
@@ -88,8 +134,14 @@ class Config:
     @property
     def data_dir(self) -> Path:
         d = self.root / "data"
-        d.mkdir(exist_ok=True)
+        d.mkdir(parents=True, exist_ok=True)
         return d
+
+    @property
+    def setup_completed(self) -> bool:
+        """ผ่านตัวช่วยตั้งค่าครั้งแรกแล้วหรือยัง (เขียนโดย hotkey/setup_wizard.py เป็น "true"/"false")"""
+        value = self.raw.get("setup", {}).get("completed", False)
+        return str(value).strip().lower() in ("1", "true", "yes")
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -159,7 +211,8 @@ def set_config_value(root: Path, section: str, key: str, value: str | list[str])
 
 
 def load_config(root: Path | None = None) -> Config:
-    root = Path(root or os.environ.get("TRANSLATOR_ROOT") or PROJECT_ROOT)
+    root = Path(root) if root else user_data_dir()
+    ensure_user_files(root)
     cfg_path = root / "config.toml"
     if not cfg_path.exists():
         raise FileNotFoundError(f"ไม่พบไฟล์ตั้งค่า: {cfg_path}")

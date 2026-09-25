@@ -84,3 +84,6 @@ autostart = true
 font_size = 11
 # ป๊อปอัปปิดเองหลังกี่วินาที (0 = ไม่ปิดเอง)
 auto_close_seconds = 0
+
+[setup]
+completed = "true"

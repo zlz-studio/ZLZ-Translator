@@ -11,7 +11,7 @@ from typing import Callable
 import pystray
 from PIL import Image, ImageDraw, ImageFont
 
-from core.config import MODEL_PRESETS, TONES
+from core.config import APP_NAME, MODEL_PRESETS, TONES
 
 TONE_LABELS = {"formal": "ทางการ", "friendly": "เป็นกันเอง", "brief": "สั้น"}
 
@@ -55,10 +55,12 @@ class Tray:
         get_hotkeys: Callable[[], str] = lambda: "",
         get_preset: Callable[[], str] = lambda: "auto",
         set_preset: Callable[[str], None] = lambda _key: None,
+        open_wizard: Callable[[], None] = lambda: None,
     ):
         self._get_hotkeys = get_hotkeys
         self._get_preset = get_preset
         self._set_preset = set_preset
+        self._open_wizard = open_wizard
         self._get_status = get_status
         self._get_tone = get_tone
         self._set_tone = set_tone
@@ -76,7 +78,7 @@ class Tray:
         self._toggle_autostart = toggle_autostart
         self._icons = {"normal": _make_icon_image(_BLUE), "busy": _make_icon_image(_ORANGE), "off": _make_icon_image(_GRAY)}
         self._busy = False
-        self.icon = pystray.Icon("discord-translator", self._icons["normal"], "Discord Translator", menu=self._menu())
+        self.icon = pystray.Icon("zlz-translator", self._icons["normal"], APP_NAME, menu=self._menu())
 
     def _menu(self) -> pystray.Menu:
         def tone_item(tone: str):
@@ -108,6 +110,7 @@ class Tray:
             pystray.MenuItem(lambda _i: self._get_status(), None, enabled=False),
             pystray.MenuItem(lambda _i: self._get_usage(), None, enabled=False),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("ตัวช่วยตั้งค่าทีละขั้น (ติดตั้ง / คีย์ / ล็อกอิน)...", lambda: self._open_wizard()),
             pystray.MenuItem("ตั้งค่า: คีย์ / ปุ่มลัด / บัญชี...", lambda: self._open_settings()),
             pystray.MenuItem("น้ำเสียงตอนตอบ", pystray.Menu(*[tone_item(t) for t in TONES])),
             pystray.MenuItem("โมเดลแปล", pystray.Menu(*[preset_item(k) for k in MODEL_PRESETS])),
@@ -137,13 +140,13 @@ class Tray:
     def refresh_icon(self) -> None:
         if not self._get_enabled():
             self.icon.icon = self._icons["off"]
-            self.icon.title = "Discord Translator (ปิดอยู่)"
+            self.icon.title = f"{APP_NAME} (ปิดอยู่)"
         elif self._busy:
             self.icon.icon = self._icons["busy"]
-            self.icon.title = "Discord Translator (กำลังแปล...)"
+            self.icon.title = f"{APP_NAME} (กำลังแปล...)"
         else:
             self.icon.icon = self._icons["normal"]
-            self.icon.title = "Discord Translator"
+            self.icon.title = APP_NAME
 
     def refresh(self) -> None:
         self.refresh_icon()

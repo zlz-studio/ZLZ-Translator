@@ -2,5 +2,6 @@
 .env
 data/
 dist/
+build/pyi/
 __pycache__/
 *.pyc

@@ -11,7 +11,7 @@ from typing import Callable
 
 import keyboard
 
-from core.config import MODES, set_config_value, set_env_value
+from core.config import APP_NAME, MODES, set_config_value, set_env_value
 from core.providers import ProviderError
 from hotkey.popup import ACCENT, BG, FG, MUTED, PANEL
 
@@ -41,7 +41,7 @@ class SettingsDialog:
         small = ("Segoe UI", 9)
 
         win = self.win = tk.Toplevel(root)
-        win.title("Discord Translator: ตั้งค่าคีย์และบัญชี")
+        win.title(f"{APP_NAME}: ตั้งค่าคีย์และบัญชี")
         win.configure(bg=BG)
         win.attributes("-topmost", True)
         win.resizable(False, False)

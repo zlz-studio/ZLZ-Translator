@@ -27,7 +27,7 @@ if _ROOT not in sys.path:
 
 import keyboard  # noqa: E402
 
-from core.config import MODEL_PRESETS, MODES, apply_preset, current_preset, load_config  # noqa: E402
+from core.config import APP_NAME, MODEL_PRESETS, MODES, apply_preset, current_preset, is_frozen, load_config  # noqa: E402
 from core.providers import ProviderError  # noqa: E402
 from core.translator import Result, Translator  # noqa: E402
 from hotkey import autostart  # noqa: E402
@@ -54,7 +54,7 @@ class App:
 
         self.root = tk.Tk()
         self.root.withdraw()
-        self.root.title("Discord Translator")
+        self.root.title(APP_NAME)
 
         self.tray = Tray(
             get_status=self._status_text,
@@ -75,6 +75,7 @@ class App:
             get_hotkeys=self._hotkeys_text,
             get_preset=self._get_preset,
             set_preset=lambda key: self.ui(self._set_preset, key),
+            open_wizard=lambda: self.ui(self._open_wizard),
         )
         self._autostart_state = autostart.is_enabled()
         self.discord_proc: subprocess.Popen | None = None
@@ -90,10 +91,10 @@ class App:
         if not self.cfg.secret("DISCORD_TOKEN"):
             self.toast("ยังไม่ได้ใส่ DISCORD_TOKEN ในไฟล์ .env")
             return
-        exe = sys.executable
+        # รันจาก .exe: ตัวโปรแกรมเองรับ --discord-bot (ดู zlz_translator.py)  รันจากซอร์ส: python -m
+        cmd = [sys.executable, "--discord-bot"] if is_frozen() else [sys.executable, "-m", "discord_app.bot"]
         creationflags = 0x08000000 if sys.platform == "win32" else 0  # CREATE_NO_WINDOW
-        self.discord_proc = subprocess.Popen([exe, "-m", "discord_app.bot"], cwd=str(self.cfg.root),
-                                             creationflags=creationflags)
+        self.discord_proc = subprocess.Popen(cmd, cwd=str(self.cfg.root), creationflags=creationflags)
         log.info("discord app started pid=%s", self.discord_proc.pid)
         self.toast("เปิด Discord app แล้ว (พร้อมใช้ใน 10 วินาที)")
         self.tray.refresh()
@@ -180,6 +181,14 @@ class App:
     # ---------------------------------------------------------------- ตั้งค่า / เปิดอัตโนมัติ
     def _open_settings(self) -> None:
         SettingsDialog(self.root, self, on_saved=self._on_settings_saved)
+
+    def _open_wizard(self) -> None:
+        """เปิดตัวช่วยตั้งค่าทีละขั้นซ้ำ (เปลี่ยนคีย์/บัญชี/ติดตั้ง Claude ทีหลัง)"""
+        from hotkey.setup_wizard import run_wizard
+
+        if run_wizard(parent=self.root):
+            self._on_settings_saved()
+            self.toast("ตั้งค่าเรียบร้อย")
 
     def _on_settings_saved(self) -> None:
         self._reload(quiet=True)
@@ -431,7 +440,7 @@ class App:
         if self.cfg.discord_autostart and self.cfg.secret("DISCORD_TOKEN"):
             self.root.after(500, self._start_discord)
         hint = "  ".join(f"{self.cfg.hotkey(m)}={m}" for m in MODES if self.cfg.hotkey(m))
-        self.root.after(300, lambda: Toast(self.root, f"Discord Translator พร้อมใช้\n{hint}", seconds=4))
+        self.root.after(300, lambda: Toast(self.root, f"{APP_NAME} พร้อมใช้\n{hint}", seconds=4))
         log.info("app started")
         try:
             self.root.mainloop()
@@ -452,6 +461,12 @@ def _setup_logging(cfg) -> None:
 
 
 def main() -> None:
+    # เปิดครั้งแรก (ยังไม่ได้ผ่านตัวช่วยตั้งค่า) -> พาตั้งค่าก่อน ถ้าผู้ใช้ปิดกลางคันก็ยังไม่เปิดโปรแกรม
+    if not load_config().setup_completed:
+        from hotkey.setup_wizard import run_wizard
+
+        if not run_wizard():
+            return
     app = App()
     _setup_logging(app.cfg)
     app.run()
