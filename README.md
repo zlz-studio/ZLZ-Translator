@@ -1,7 +1,17 @@
-# Discord Translator (ZLZ-Translator)
+# ZLZ Translator
 
 Repo: https://github.com/zlz-studio/ZLZ-Translator
-มือใหม่เริ่มที่ **[FRIEND_GUIDE.md](FRIEND_GUIDE.md)** (ติดตั้งใน 10 นาที ใช้แค่บัญชี Gmail)
+มือใหม่เริ่มที่ **[FRIEND_GUIDE.md](FRIEND_GUIDE.md)** (ติดตั้งใน 5 นาที ใช้แค่บัญชี Gmail)
+
+## ติดตั้ง (แบบง่าย ไม่ต้องลง Python)
+
+1. โหลด **`ZLZ-Translator-Setup-x.y.z.exe`** จากหน้า [Releases](https://github.com/zlz-studio/ZLZ-Translator/releases) แล้วดับเบิลคลิก
+2. กด Next จนเสร็จ (ติดตั้งในโฟลเดอร์ผู้ใช้ ไม่ต้องสิทธิ์ Admin ได้ไอคอนบน Desktop + Start Menu + ตัว Uninstall)
+3. เปิดโปรแกรมครั้งแรกจะเจอ **ตัวช่วยตั้งค่าทีละขั้น**: ตรวจ/ติดตั้ง Claude Code ให้ → ปุ่มพาไปขอคีย์ Gemini แล้วตรวจคีย์ให้ → ปุ่ม Login Claude → เสร็จ กด "ถัดไป" ไม่ได้จนกว่าแต่ละขั้นจะผ่านจริง
+4. โปรแกรมไปอยู่ที่ไอคอนมุมขวาล่างจอ กด **F8** / **F9** ได้เลย
+
+ข้อมูลของคุณ (คีย์, config.toml, glossary.md, log) เก็บที่ `%APPDATA%\ZLZ Translator` ไม่ได้อยู่ในโฟลเดอร์โปรแกรม อัปเดตเวอร์ชันใหม่โดยรัน Setup.exe ตัวใหม่ทับได้เลย ค่าที่ตั้งไว้ไม่หาย
+เรียกตัวช่วยตั้งค่าซ้ำได้จากเมนูไอคอน tray > **ตัวช่วยตั้งค่าทีละขั้น...**
 
 เครื่องมือแปลสำหรับฟรีแลนซ์ไทยที่ต้องคุยกับลูกค้าต่างชาติ ใช้ได้กับ Discord และทุกแอปบน Windows
 แปลผ่าน **Claude Code** (ใช้โควต้าสมาชิก Claude ที่มีอยู่ ไม่ต้องเติมเครดิต) และสลับไป Gemini / Claude API / Ollama ได้
@@ -22,11 +32,17 @@ Repo: https://github.com/zlz-studio/ZLZ-Translator
 - คลิกขวา = เมนู: **ตั้งค่าคีย์และบัญชี...** (ปุ่มพาไปหน้าขอคีย์ Gemini, ช่องวางคีย์, **ตั้งปุ่มลัดเองโดยกดคีย์ที่ต้องการ**, ตัวเลือกให้ปุ่มลัดทำงานเฉพาะใน Discord), น้ำเสียงตอนตอบ, เปิด/ปิด Discord app, **เปิดอัตโนมัติเมื่อเข้า Windows**, คลังศัพท์, จำนวนครั้งที่ใช้วันนี้, ออกจากโปรแกรม
 - ปุ่มลัดทำงานได้ทุกโปรแกรม ไม่เฉพาะ Discord
 
-> ส่งให้คนอื่นใช้: รัน `make_share_zip.py` จะได้ `dist\Discord-Translator-share.zip` ที่ไม่มีคีย์ของคุณ พร้อมคู่มือ `FRIEND_GUIDE.md` อยู่ข้างใน
+> ส่งให้คนอื่นใช้: ส่งลิงก์หน้า [Releases](https://github.com/zlz-studio/ZLZ-Translator/releases) ให้โหลด Setup.exe (ไม่มีคีย์ของคุณติดไปแน่นอน เพราะคีย์อยู่ใน `%APPDATA%` ไม่ได้อยู่ในตัวโปรแกรม)
 
 > ขั้นตอนแบบละเอียดทีละคลิก อยู่ใน **[SETUP_GUIDE.md](SETUP_GUIDE.md)**
 
-## ติดตั้งครั้งแรก (ทำครั้งเดียว)
+## สร้างตัวติดตั้งเอง (สำหรับผู้พัฒนา)
+
+- **ในเครื่อง**: ดับเบิลคลิก `build.bat` (ต้องมี `.venv` จาก `setup.bat` และ [Inno Setup 6](https://jrsoftware.org/isinfo.php) — ลงด้วย `winget install JRSoftware.InnoSetup`) ได้ `dist\ZLZ-Translator-Setup-<เวอร์ชัน>.exe`
+- **อัตโนมัติบน GitHub**: แก้ `APP_VERSION` ใน `core/config.py` แล้ว `git tag v1.0.1 && git push origin v1.0.1` → GitHub Actions (`.github/workflows/release.yml`) จะ build และแนบ Setup.exe ขึ้นหน้า Releases ให้เอง
+- ส่วนประกอบ: `zlz_translator.py` (จุดเข้าโปรแกรม), `zlz_translator.spec` (PyInstaller), `installer/ZLZ-Translator.iss` (Inno Setup), `build/make_icon.py` (ไอคอน)
+
+## ติดตั้งจากซอร์สโค้ด (สำหรับผู้พัฒนา ทำครั้งเดียว)
 
 **1. ติดตั้งไลบรารี** ดับเบิลคลิก `setup.bat` (ต้องมี Python 3.11 ขึ้นไป ถ้ายังไม่มีโหลดจาก python.org แล้วติ๊ก "Add to PATH")
 

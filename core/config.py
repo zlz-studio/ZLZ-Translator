@@ -2,12 +2,58 @@
 from __future__ import annotations
 
 import os
+import shutil
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+APP_NAME = "ZLZ Translator"
+APP_VERSION = "1.0.0"  # build.bat และตัวติดตั้งอ่านค่านี้
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# ไฟล์ค่าเริ่มต้นที่ต้องมีในโฟลเดอร์ข้อมูลผู้ใช้ (ชื่อในโฟลเดอร์ผู้ใช้ -> ชื่อต้นฉบับใน bundle)
+_DEFAULT_FILES = {"config.toml": "config.toml", "glossary.md": "glossary.md", ".env": ".env.example"}
+
+
+def is_frozen() -> bool:
+    """รันจาก .exe ที่ PyInstaller สร้าง (ไม่ใช่จากซอร์ส)"""
+    return bool(getattr(sys, "frozen", False))
+
+
+def bundle_dir() -> Path:
+    """โฟลเดอร์ที่มีไฟล์ค่าเริ่มต้น: ใน .exe คือโฟลเดอร์ชั่วคราวของ PyInstaller, รันจากซอร์สคือโปรเจกต์"""
+    return Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
+
+
+def user_data_dir() -> Path:
+    """ที่เก็บ config.toml / glossary.md / .env / data ของผู้ใช้
+
+    รันจากซอร์ส = โฟลเดอร์โปรเจกต์ (เหมือนเดิม)  รันจาก .exe = %APPDATA%/ZLZ Translator
+    เพราะโฟลเดอร์ที่ติดตั้งโปรแกรมอาจเขียนไม่ได้ และผู้ใช้ไม่ควรต้องรู้ว่าโปรแกรมติดตั้งอยู่ที่ไหน
+    """
+    override = os.environ.get("TRANSLATOR_ROOT")
+    if override:
+        return Path(override)
+    if is_frozen():
+        base = os.environ.get("APPDATA") or str(Path.home())
+        return Path(base) / APP_NAME
+    return PROJECT_ROOT
+
+
+def ensure_user_files(root: Path) -> None:
+    """สร้างโฟลเดอร์ผู้ใช้และก๊อปไฟล์ค่าเริ่มต้นที่ยังไม่มี (ไม่ทับของเดิม)"""
+    src_dir = bundle_dir()
+    if root.resolve() == src_dir.resolve():
+        return
+    root.mkdir(parents=True, exist_ok=True)
+    for name, source in _DEFAULT_FILES.items():
+        target = root / name
+        src = src_dir / source
+        if not target.exists() and src.exists():
+            shutil.copyfile(src, target)
 
 MODEL_ALIASES = {
     "haiku": "claude-haiku-4-5",
@@ -17,6 +63,15 @@ MODEL_ALIASES = {
 
 TONES = ("formal", "friendly", "brief")
 MODES = ("read", "reply", "explain", "polish")
+
+# ชุดโมเดลให้เลือกจากเมนู tray: key -> (ชื่อในเมนู, provider_order, ชื่อย่อรุ่น Claude ที่จะตั้งให้ทุกโหมด หรือ None = ไม่แตะ)
+# ตัวเลข ~วินาที มาจากการวัดจริงกับอีเมล 600 ตัวอักษร (โหมดแปลเป็นไทย)
+MODEL_PRESETS: dict[str, tuple[str, list[str], str | None]] = {
+    "auto": ("อัตโนมัติ: Gemini ก่อน, Claude Sonnet สำรอง (แนะนำ)", ["gemini", "claude_code"], None),
+    "gemini": ("Gemini flash-lite อย่างเดียว (เร็วสุด ~4 วิ)", ["gemini"], None),
+    "sonnet": ("Claude Sonnet อย่างเดียว (แม่นกว่า ~9 วิ)", ["claude_code"], "sonnet"),
+    "opus": ("Claude Opus อย่างเดียว (ดีสุด ~9 วิ กินโควต้ามาก)", ["claude_code"], "opus"),
+}
 
 
 @dataclass
@@ -44,6 +99,11 @@ class Config:
     @property
     def auto_back_translate(self) -> bool:
         return bool(self.raw.get("general", {}).get("auto_back_translate", True))
+
+    @property
+    def hedge_after_seconds(self) -> float:
+        """ตัวหลักยังไม่ส่งคำแรกภายในกี่วินาที ให้ปล่อยตัวสำรองวิ่งคู่ (0 = ยิงพร้อมกันเลย, ติดลบ = ไม่ต้อง)"""
+        return float(self.raw.get("general", {}).get("hedge_after_seconds", 3.0))
 
     def model_for(self, mode: str) -> str:
         """ชื่อรุ่นโมเดล (ชื่อย่อ) สำหรับโหมดนั้น"""
@@ -74,8 +134,14 @@ class Config:
     @property
     def data_dir(self) -> Path:
         d = self.root / "data"
-        d.mkdir(exist_ok=True)
+        d.mkdir(parents=True, exist_ok=True)
         return d
+
+    @property
+    def setup_completed(self) -> bool:
+        """ผ่านตัวช่วยตั้งค่าครั้งแรกแล้วหรือยัง (เขียนโดย hotkey/setup_wizard.py เป็น "true"/"false")"""
+        value = self.raw.get("setup", {}).get("completed", False)
+        return str(value).strip().lower() in ("1", "true", "yes")
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -145,7 +211,8 @@ def set_config_value(root: Path, section: str, key: str, value: str | list[str])
 
 
 def load_config(root: Path | None = None) -> Config:
-    root = Path(root or os.environ.get("TRANSLATOR_ROOT") or PROJECT_ROOT)
+    root = Path(root) if root else user_data_dir()
+    ensure_user_files(root)
     cfg_path = root / "config.toml"
     if not cfg_path.exists():
         raise FileNotFoundError(f"ไม่พบไฟล์ตั้งค่า: {cfg_path}")
@@ -154,3 +221,22 @@ def load_config(root: Path | None = None) -> Config:
     glossary_path = root / "glossary.md"
     glossary = glossary_path.read_text(encoding="utf-8") if glossary_path.exists() else ""
     return Config(raw=raw, root=root, glossary=glossary, env=_load_env(root / ".env"))
+
+
+def current_preset(cfg: Config) -> str:
+    """key ของ MODEL_PRESETS ที่ตรงกับ config ตอนนี้ หรือ "custom" ถ้าผู้ใช้ตั้งเองใน config.toml"""
+    order = cfg.provider_order
+    aliases = {cfg.model_for(m) for m in MODES}
+    for key, (_label, preset_order, alias) in MODEL_PRESETS.items():
+        if order == preset_order and (alias is None or aliases == {alias}):
+            return key
+    return "custom"
+
+
+def apply_preset(root: Path, key: str) -> None:
+    """บันทึกชุดโมเดลที่เลือกลง config.toml (provider_order และรุ่น Claude ของทุกโหมด)"""
+    _label, order, alias = MODEL_PRESETS[key]
+    set_config_value(root, "general", "provider_order", order)
+    if alias:
+        for mode in MODES:
+            set_config_value(root, "modes", mode, alias)

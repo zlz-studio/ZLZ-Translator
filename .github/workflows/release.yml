@@ -1,0 +1,62 @@
+# สร้างตัวติดตั้งอัตโนมัติเมื่อติด tag เวอร์ชัน แล้วแนบไฟล์ขึ้นหน้า GitHub Releases
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# ผลลัพธ์: https://github.com/zlz-studio/ZLZ-Translator/releases  มีไฟล์ ZLZ-Translator-Setup-1.0.0.exe ให้โหลด
+# (เครื่อง windows-latest ของ GitHub มี Inno Setup ติดมาแล้ว ไม่ต้องติดตั้งเพิ่ม)
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Version from tag (or core/config.py when run manually)
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(python -c 'from core.config import APP_VERSION; print(APP_VERSION)')" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build icon + standalone folder (PyInstaller)
+        run: |
+          python build/make_icon.py
+          python -m PyInstaller --noconfirm --clean --workpath build/pyi --distpath dist zlz_translator.spec
+
+      - name: Build Setup.exe (Inno Setup)
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DMyAppVersion=${{ steps.ver.outputs.version }}" installer\ZLZ-Translator.iss
+
+      - name: Upload artifact (for manual runs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZLZ-Translator-Setup-${{ steps.ver.outputs.version }}
+          path: dist/ZLZ-Translator-Setup-*.exe
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ZLZ-Translator-Setup-*.exe
+          generate_release_notes: true
