@@ -72,37 +72,45 @@ def _write_clipboard(text: str) -> None:
             time.sleep(0.05)
 
 
-def _capture(keys: list[int]) -> tuple[str, str]:
-    """ส่งชุด Ctrl+ปุ่ม แล้วอ่านสิ่งที่ถูกก๊อป คืน (ข้อความที่ได้, clipboard เดิม)"""
+def _begin_capture() -> str:
+    """สำรอง clipboard เดิมแล้วใส่ค่าสัญลักษณ์ไว้ตรวจว่าก๊อปสำเร็จไหม"""
     previous = _read_clipboard()
     _write_clipboard(_SENTINEL)
-    captured = ""
-    for attempt in range(3):  # ถ้าครั้งแรกยังว่าง (แอปยังอัปเดตการเลือกไม่ทัน) ลองซ้ำ
+    return previous
+
+
+def _capture(keys: list[int], attempts: int = 3, polls: int = 25) -> str:
+    """ส่งชุด Ctrl+ปุ่ม แล้วอ่านสิ่งที่ถูกก๊อป (ต้องเรียก _begin_capture ก่อน)"""
+    for attempt in range(attempts):  # ถ้าครั้งแรกยังว่าง (แอปยังอัปเดตการเลือกไม่ทัน) ลองซ้ำ
         for vk in keys if attempt == 0 else keys[-1:]:
             send_ctrl(vk)
             time.sleep(0.25)  # ให้แอป (โดยเฉพาะ Discord) อัปเดตการเลือกก่อนก๊อป
-        for _ in range(25):  # รอผลก๊อปสูงสุด ~0.75 วินาที
+        for _ in range(polls):  # รอผลก๊อปสูงสุด polls x 0.03 วินาที
             time.sleep(0.03)
             current = _read_clipboard()
             if current and current != _SENTINEL:
-                captured = current
-                break
-        if captured:
-            break
-    return captured, previous
+                return current
+    return ""
 
 
 def copy_selection() -> str:
     """ก๊อปข้อความที่ผู้ใช้ลากคลุมไว้ แล้วคืน clipboard เดิม"""
-    text, previous = _capture([VK_C])
+    previous = _begin_capture()
+    text = _capture([VK_C])
     _write_clipboard(previous)
     return text.strip()
 
 
-def select_all_and_copy() -> tuple[str, str]:
-    """เลือกทั้งช่องพิมพ์แล้วก๊อป (ยังไม่คืน clipboard เพราะจะ paste ต่อ)"""
-    text, previous = _capture([VK_A, VK_C])
-    return text.strip(), previous
+def copy_selection_or_all() -> tuple[str, str, bool]:
+    """ถ้ามีข้อความที่ลากคลุมอยู่ ใช้แค่ส่วนนั้น (ส่วนอื่นในช่องพิมพ์ เช่นรูป/อีโมจิ ไม่ถูกแตะ)
+    ถ้าไม่ได้ลากคลุม เลือกทั้งช่องพิมพ์แทน
+    คืน (ข้อความดิบ, clipboard เดิม, เป็นแค่ส่วนที่ลากคลุมไหม)
+    ยังไม่คืน clipboard เพราะจะ paste ทับส่วนที่เลือกต่อ"""
+    previous = _begin_capture()
+    text = _capture([VK_C], attempts=1, polls=20)
+    if text:
+        return text, previous, True
+    return _capture([VK_A, VK_C]), previous, False
 
 
 def paste_replace(text: str, previous_clipboard: str) -> None:

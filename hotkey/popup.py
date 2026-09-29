@@ -141,6 +141,10 @@ class ResultPopup:
             self._button(bar, "แปลกลับเช็ก", lambda: on_back_translate(result.text)).pack(side="left", padx=(6, 0))
         self._button(bar, "ปิด", self.close).pack(side="right")
 
+        for widget in (orig, self.out, self.check):
+            if widget is not None:
+                self._make_copyable(widget)
+
         win.bind("<Escape>", lambda _e: self.close())
         width = 520
         win.update_idletasks()
@@ -157,9 +161,54 @@ class ResultPopup:
                          disabledforeground="#6a6c72", cursor="hand2")
 
     def _copy(self) -> None:
-        text = self.out.get("1.0", "end").strip()
+        self._copy_text(self.out.get("1.0", "end").strip())
+
+    def _copy_text(self, text: str) -> None:
+        if not text:
+            return
         if self.on_copy:
             self.on_copy(text)
+        else:
+            self.win.clipboard_clear()
+            self.win.clipboard_append(text)
+
+    # ---- ลากคลุม/ก๊อปข้อความในป๊อปอัปได้ทุกช่อง (ต้นฉบับ, ผลแปล, แปลกลับ) ----
+    def _make_copyable(self, widget: tk.Text) -> None:
+        widget.configure(cursor="xterm", selectbackground=ACCENT, selectforeground="white",
+                         inactiveselectbackground=ACCENT)
+
+        def focus(_e):
+            # ช่องที่ disabled ไม่รับโฟกัสเองตอนคลิก และป๊อปอัปอาจเปิดแบบไม่แย่งโฟกัส ต้องดึงเอง
+            self.win.focus_force()
+            widget.focus_set()
+
+        def on_ctrl_key(e):
+            # เทียบด้วย keycode (virtual-key) เพราะตอนเปิดแป้นไทย Ctrl+C ไม่ได้ส่งตัว "c"
+            if e.keycode == 0x43:  # C
+                self._copy_widget(widget)
+                return "break"
+            if e.keycode == 0x41:  # A
+                widget.tag_add("sel", "1.0", "end-1c")
+                return "break"
+            return None
+
+        menu = tk.Menu(widget, tearoff=0)
+        menu.add_command(label="ก๊อปส่วนที่เลือก", command=lambda: self._copy_widget(widget))
+        menu.add_command(label="ก๊อปทั้งหมดในช่องนี้",
+                         command=lambda: self._copy_text(widget.get("1.0", "end").strip()))
+        menu.add_command(label="เลือกทั้งหมด", command=lambda: widget.tag_add("sel", "1.0", "end-1c"))
+
+        widget.bind("<Button-1>", focus, add="+")
+        widget.bind("<Control-KeyPress>", on_ctrl_key)
+        widget.bind("<Button-3>", lambda e: menu.tk_popup(e.x_root, e.y_root))
+
+    def _copy_widget(self, widget: tk.Text) -> None:
+        """ก๊อปส่วนที่ลากคลุมไว้ ถ้าไม่ได้ลากคลุมก๊อปทั้งช่อง"""
+        try:
+            text = widget.get("sel.first", "sel.last")
+        except tk.TclError:
+            text = widget.get("1.0", "end")
+        self._copy_text(text.strip())
 
     def set_check(self, text: str) -> None:
         """ใส่ผลแปลกลับ (เรียกจากเธรด tkinter)"""

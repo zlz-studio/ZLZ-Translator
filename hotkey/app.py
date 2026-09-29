@@ -198,6 +198,7 @@ class App:
     # ---------------------------------------------------------------- worker thread
     def _work(self, mode: str) -> None:
         previous_clip: str | None = None
+        lead = trail = ""
         try:
             self.ui(self.tray.set_busy, True)
             clip.wait_modifiers_released()
@@ -207,7 +208,13 @@ class App:
                     self.toast("ไม่พบข้อความที่ลากคลุมไว้ (ลากคลุมข้อความก่อนแล้วกดปุ่มลัด)")
                     return
             else:
-                text, previous_clip = clip.select_all_and_copy()
+                # ลากคลุมไว้ = แปลแค่ส่วนนั้น, ไม่ได้ลากคลุม = แปลทั้งช่องพิมพ์
+                raw, previous_clip, partial = clip.copy_selection_or_all()
+                text = raw.strip()
+                if partial and text:
+                    # เก็บช่องว่างหน้า/หลังส่วนที่เลือกไว้ ไม่ให้คำติดกับข้อความรอบๆ
+                    lead = raw[: len(raw) - len(raw.lstrip(" \t"))]
+                    trail = raw[len(raw.rstrip(" \t")):]
                 if not text:
                     clip.restore_clipboard(previous_clip)
                     previous_clip = None
@@ -219,7 +226,7 @@ class App:
             log.info("%s via %s/%s in %.1fs", mode, result.provider, result.model, result.seconds)
 
             if mode in ("reply", "polish"):
-                clip.paste_replace(result.text, previous_clip or "")
+                clip.paste_replace(lead + result.text + trail, previous_clip or "")
                 previous_clip = None
                 self.ui(self._show_popup, result, text, False)
                 self._auto_check(result)
