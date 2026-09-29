@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import ctypes
 import logging
 import os
 import queue
@@ -34,6 +35,7 @@ from hotkey import autostart  # noqa: E402
 from hotkey import clipboard as clip  # noqa: E402
 from hotkey.popup import ResultPopup, Toast  # noqa: E402
 from hotkey.settings_dialog import SettingsDialog  # noqa: E402
+from hotkey.single_instance import SingleInstance  # noqa: E402
 from hotkey.tray import Tray  # noqa: E402
 
 log = logging.getLogger("hotkey")
@@ -474,15 +476,35 @@ def _setup_logging(cfg) -> None:
 
 
 def main() -> None:
-    # เปิดครั้งแรก (ยังไม่ได้ผ่านตัวช่วยตั้งค่า) -> พาตั้งค่าก่อน ถ้าผู้ใช้ปิดกลางคันก็ยังไม่เปิดโปรแกรม
-    if not load_config().setup_completed:
-        from hotkey.setup_wizard import run_wizard
+    # เปิดได้ทีละตัว: ถ้าตัวเก่ายังเปิดอยู่ (เช่นเพิ่งแก้โค้ดแล้วดับเบิลคลิก run_hotkey.bat ซ้ำ)
+    # สั่งตัวเก่าปิดแล้วตัวนี้ทำงานแทน ไม่งั้นสองตัวจะรับปุ่มลัดพร้อมกัน
+    instance = SingleInstance()
+    if not instance.acquire():
+        ctypes.windll.user32.MessageBoxW(
+            None, f"{APP_NAME} ตัวเก่ายังเปิดอยู่และปิดเองไม่ได้\n"
+                  "คลิกขวาที่ไอคอนใน tray แล้วเลือก \"ออกจากโปรแกรม\" (หรือปิดใน Task Manager) แล้วเปิดใหม่",
+            APP_NAME, 0x30)  # MB_ICONWARNING
+        return
+    try:
+        # เปิดครั้งแรก (ยังไม่ได้ผ่านตัวช่วยตั้งค่า) -> พาตั้งค่าก่อน ถ้าผู้ใช้ปิดกลางคันก็ยังไม่เปิดโปรแกรม
+        if not load_config().setup_completed:
+            from hotkey.setup_wizard import run_wizard
 
-        if not run_wizard():
-            return
-    app = App()
-    _setup_logging(app.cfg)
-    app.run()
+            if not run_wizard():
+                return
+        app = App()
+        _setup_logging(app.cfg)
+        if instance.replaced_previous:
+            log.info("ปิดตัวเก่าที่เปิดค้างอยู่แล้วทำงานแทน")
+
+        def on_replaced() -> None:
+            log.info("มีตัวใหม่เปิดขึ้นมา ปิดตัวเองให้ตัวใหม่ทำงานแทน")
+            app.ui(app.quit)
+
+        instance.watch(on_replaced)
+        app.run()
+    finally:
+        instance.release()
 
 
 if __name__ == "__main__":
