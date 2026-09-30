@@ -26,13 +26,12 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-import keyboard  # noqa: E402
-
 from core.config import APP_NAME, MODEL_PRESETS, MODES, apply_preset, current_preset, is_frozen, load_config  # noqa: E402
 from core.providers import ProviderError  # noqa: E402
 from core.translator import Result, Translator  # noqa: E402
 from hotkey import autostart  # noqa: E402
 from hotkey import clipboard as clip  # noqa: E402
+from hotkey.hotkeys import HotkeyManager  # noqa: E402
 from hotkey.popup import ResultPopup, Toast  # noqa: E402
 from hotkey.settings_dialog import SettingsDialog  # noqa: E402
 from hotkey.single_instance import SingleInstance  # noqa: E402
@@ -81,6 +80,7 @@ class App:
         )
         self._autostart_state = autostart.is_enabled()
         self.discord_proc: subprocess.Popen | None = None
+        self.hotkeys = HotkeyManager(self._on_hotkey)
         self._register_hotkeys()
 
     # ---------------------------------------------------------------- Discord app (โปรเซสลูก)
@@ -142,38 +142,28 @@ class App:
 
     # ---------------------------------------------------------------- hotkeys
     def _register_hotkeys(self) -> None:
-        for handle in getattr(self, "_hotkey_handles", []):
-            try:
-                keyboard.remove_hotkey(handle)
-            except (KeyError, ValueError):
-                pass
-        self._hotkey_handles = []
-        bound = []
-        for mode in MODES:
-            combo = self.cfg.hotkey(mode)
-            if not combo:
-                continue
-            try:
-                self._hotkey_handles.append(
-                    keyboard.add_hotkey(combo, self._on_hotkey, args=(mode,), suppress=False)
-                )
-                bound.append(f"{combo} = {mode}")
-            except (ValueError, KeyError) as e:
-                log.error("ผูกปุ่ม %s ให้โหมด %s ไม่ได้: %s", combo, mode, e)
-        log.info("hotkeys: %s", ", ".join(bound))
+        bindings = {mode: combo for mode in MODES if (combo := self.cfg.hotkey(mode))}
+        self.hotkeys.set(bindings)
+        log.info("hotkeys: %s", ", ".join(self.hotkeys.bound))
+        for err in self.hotkeys.errors:
+            log.error("ผูกปุ่มลัดไม่ได้: %s", err)
+            self.toast(f"ผูกปุ่มลัดไม่ได้: {err}", seconds=6)
 
-    def _on_hotkey(self, mode: str) -> None:
+    def _on_hotkey(self, mode: str) -> bool:
+        """เรียกจากเธรดปุ่มลัด คืน False = ไม่ใช้ปุ่มนี้ ให้ส่งต่อไปโปรแกรมที่โฟกัสอยู่ตามปกติ"""
         if self.paused:
-            return
+            return False
         apps = self.cfg.only_in_apps
         if apps:
             title = clip.foreground_window_title()
             if not any(a.lower() in title.lower() for a in apps):
-                return  # อยู่ในโปรแกรมอื่น ปล่อยให้ปุ่มทำงานตามปกติของโปรแกรมนั้น
+                return False  # อยู่ในโปรแกรมอื่น ปล่อยให้ปุ่มทำงานตามปกติของโปรแกรมนั้น
+        log.info("hotkey %s", mode)
         if not self.busy.acquire(blocking=False):
             self.toast("กำลังแปลอันก่อนหน้าอยู่ รอสักครู่...")
-            return
+            return True
         threading.Thread(target=self._work, args=(mode,), daemon=True, name=f"translate-{mode}").start()
+        return True
 
     def _toggle_paused(self) -> None:
         self.paused = not self.paused
@@ -460,7 +450,7 @@ class App:
         try:
             self.root.mainloop()
         finally:
-            keyboard.unhook_all()
+            self.hotkeys.stop()
             self.tray.stop()
 
     def quit(self) -> None:
