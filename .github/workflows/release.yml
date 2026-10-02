@@ -14,6 +14,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONUTF8: "1"  # สคริปต์ build พิมพ์ภาษาไทย ให้ Python ใช้ UTF-8 เสมอ
+
 jobs:
   build:
     runs-on: windows-latest

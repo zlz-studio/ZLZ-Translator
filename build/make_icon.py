@@ -7,6 +7,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# console บน Windows มักเป็น cp1252/cp850 พิมพ์ไทยแล้วพัง (ทั้งในเครื่องและบน GitHub Actions)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
