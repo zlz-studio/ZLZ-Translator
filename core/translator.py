@@ -119,7 +119,8 @@ class Translator:
         else:
             result = self._sequential(ready, system, user, model_alias, mode, tone, on_delta, on_reset, errors)
         if result is None:
-            raise ProviderError("แปลไม่สำเร็จ ทุกผู้ให้บริการล้มเหลว:\n- " + "\n- ".join(errors))
+            raise ProviderError("แปลไม่สำเร็จ ทุกผู้ให้บริการล้มเหลว:\n- " + "\n- ".join(errors)
+                                + "\n\nแก้ได้โดยคลิกขวาไอคอน ZLZ Translator มุมขวาล่างจอ > ตัวช่วยตั้งค่าทีละขั้น")
         return result
 
     def _result(self, name: str, prov: Provider, out: str, elapsed: float, mode: str, tone: str,

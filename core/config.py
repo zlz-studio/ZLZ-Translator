@@ -54,6 +54,10 @@ def ensure_user_files(root: Path) -> None:
         src = src_dir / source
         if not target.exists() and src.exists():
             shutil.copyfile(src, target)
+            if name == "config.toml":
+                # ไฟล์ต้นฉบับอาจมาจากเครื่องนักพัฒนาที่ผ่านตัวช่วยตั้งค่าแล้ว  ผู้ใช้ใหม่ต้องเจอตัวช่วยเสมอ
+                set_config_value(root, "setup", "completed", "false")
+                set_config_value(root, "claude_code", "command", "")
 
 MODEL_ALIASES = {
     "haiku": "claude-haiku-4-5",

@@ -86,4 +86,4 @@ font_size = 11
 auto_close_seconds = 0
 
 [setup]
-completed = "true"
+completed = "false"

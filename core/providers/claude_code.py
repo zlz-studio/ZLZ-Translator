@@ -285,7 +285,7 @@ def _result_from_data(data: dict, stderr: str, streamed: str = "") -> str:
     if data.get("is_error"):
         if "login" in result.lower():
             raise ProviderError(
-                "Claude Code ยังไม่ได้ล็อกอิน: เปิด PowerShell แล้วรันคำสั่ง claude จากนั้นพิมพ์ /login หนึ่งครั้ง"
+                "Claude Code ยังไม่ได้ล็อกอิน: ใช้ตัวช่วยตั้งค่าทีละขั้น (คลิกขวาไอคอน tray) หรือเปิด PowerShell รัน claude แล้วพิมพ์ /login"
             )
         raise ProviderError(f"Claude Code แจ้งข้อผิดพลาด: {result or stderr.strip()[:300]}")
     result = result or streamed
