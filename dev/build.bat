@@ -33,6 +33,6 @@ if not exist "%ISCC%" (
 "%ISCC%" /Q "/DMyAppVersion=%VER%" dev\installer\ZLZ-Translator.iss || (echo Inno Setup ล้มเหลว & pause & exit /b 1)
 
 echo.
-echo เสร็จแล้ว:  dev\dist\ZLZ-Translator-Setup-%VER%.exe
+echo เสร็จแล้ว:  ZLZ-Translator-Setup-%VER%.exe  (อยู่ที่ root ของโปรเจกต์)
 echo อัปโหลดไฟล์นี้ขึ้น GitHub Releases เพื่อแจกให้คนอื่น  (หรือ git tag v%VER% ^&^& git push origin v%VER% ให้ GitHub สร้างให้เอง)
 pause

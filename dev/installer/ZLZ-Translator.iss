@@ -23,7 +23,8 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputDir=..\dist
+; Setup.exe ออกไปวางที่ root ของโปรเจกต์ ให้คนเปิดโฟลเดอร์มาแล้วเห็นทันที
+OutputDir=..\..
 OutputBaseFilename=ZLZ-Translator-Setup-{#MyAppVersion}
 SetupIconFile=..\..\assets\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}

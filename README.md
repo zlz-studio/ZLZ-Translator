@@ -38,7 +38,7 @@ Repo: https://github.com/zlz-studio/ZLZ-Translator
 
 ## สร้างตัวติดตั้งเอง (สำหรับผู้พัฒนา)
 
-- **ในเครื่อง**: ดับเบิลคลิก `dev\build.bat` (ต้องมี `.venv` จาก `dev\setup.bat` และ [Inno Setup 6](https://jrsoftware.org/isinfo.php) ลงด้วย `winget install JRSoftware.InnoSetup`) ได้ `dev\dist\ZLZ-Translator-Setup-<เวอร์ชัน>.exe`
+- **ในเครื่อง**: ดับเบิลคลิก `dev\build.bat` (ต้องมี `.venv` จาก `dev\setup.bat` และ [Inno Setup 6](https://jrsoftware.org/isinfo.php) ลงด้วย `winget install JRSoftware.InnoSetup`) ได้ `ZLZ-Translator-Setup-<เวอร์ชัน>.exe` วางที่ root ของโปรเจกต์ (ไฟล์นี้เก็บใน git ด้วย เปิดโฟลเดอร์มาเห็นทันที)
 - **อัตโนมัติบน GitHub**: แก้ `APP_VERSION` ใน `core/config.py` แล้ว `git tag v1.0.1 && git push origin v1.0.1` จากนั้น GitHub Actions (`.github/workflows/release.yml`) จะ build และแนบ Setup.exe ขึ้นหน้า Releases ให้เอง
 
 ## โครงสร้างโฟลเดอร์
