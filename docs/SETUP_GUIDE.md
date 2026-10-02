@@ -48,7 +48,7 @@ C:\Users\Boss\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Cla
 
 ## ขั้นที่ 2: ใช้งานปุ่มลัด (Hotkey)
 
-1. เปิดโฟลเดอร์ `Documents\Discord-Translator` ดับเบิลคลิก **`run_hotkey.bat`**
+1. เปิดโฟลเดอร์ `Documents\Discord-Translator` ดับเบิลคลิก **`dev\run.bat`**
 2. จะมีข้อความสีน้ำเงินแว้บขึ้นว่า "Discord Translator พร้อมใช้" และมี **ไอคอนสี่เหลี่ยมสีน้ำเงิน** ที่มุมขวาล่างของจอ (system tray)
    ถ้าไม่เห็น ให้คลิกลูกศร **^** ตรง tray ไอคอนอาจซ่อนอยู่ในนั้น ลากออกมาวางไว้ข้างนอกได้
 3. **ลองแปลข้อความที่ลูกค้าส่งมา**
@@ -130,7 +130,7 @@ C:\Users\Boss\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Cla
 
 ### 4.5 เปิดโปรแกรมและทดสอบ
 
-1. ถ้าโปรแกรม Hotkey เปิดอยู่แล้ว: คลิกขวาไอคอน tray จะเห็น "Discord app: กำลังทำงาน" (เปิดให้เองเมื่อพบ token) ถ้ายังไม่เปิดให้ดับเบิลคลิก `run_hotkey.bat` ไม่มีหน้าต่างค้าง ตรวจสอบได้จาก `data\discord.log` ซึ่งจะมี 2 บรรทัดนี้
+1. ถ้าโปรแกรม Hotkey เปิดอยู่แล้ว: คลิกขวาไอคอน tray จะเห็น "Discord app: กำลังทำงาน" (เปิดให้เองเมื่อพบ token) ถ้ายังไม่เปิดให้ดับเบิลคลิก `dev\run.bat` ไม่มีหน้าต่างค้าง ตรวจสอบได้จาก `data\discord.log` ซึ่งจะมี 2 บรรทัดนี้
 
    ```
    ... synced 5 commands: en, th, fix, แปลเป็นไทย, อธิบายข้อความนี้
@@ -154,8 +154,8 @@ C:\Users\Boss\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Cla
 
 ## ขั้นที่ 5: ใช้งานประจำวัน
 
-ดับเบิลคลิก **`run_hotkey.bat`** ครั้งเดียว จะเปิดทั้ง Hotkey (ไป tray) และ Discord app ให้เอง ไม่มีหน้าต่างค้าง ปิดทั้งหมดได้จากเมนูไอคอน tray
-ถ้าใช้แค่ Hotkey ก็เปิด `run_hotkey.bat` อย่างเดียวพอ
+ดับเบิลคลิก **`dev\run.bat`** ครั้งเดียว จะเปิดทั้ง Hotkey (ไป tray) และ Discord app ให้เอง ไม่มีหน้าต่างค้าง ปิดทั้งหมดได้จากเมนูไอคอน tray
+ถ้าใช้แค่ Hotkey ก็เปิด `dev\run.bat` อย่างเดียวพอ
 
 ---
 
@@ -175,10 +175,10 @@ C:\Users\Boss\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Cla
 | อาการ | ทำอย่างไร |
 |---|---|
 | ป๊อปอัปแดง "ยังไม่ได้ล็อกอิน" | ทำขั้นที่ 1 ใหม่ (การล็อกอินอาจหมดอายุเป็นครั้งคราว) |
-| กดปุ่มลัดแล้วเงียบ | ดูว่ามีไอคอนที่ tray ไหม ถ้าไม่มีให้เปิด `run_hotkey.bat` / ลองเปลี่ยนปุ่มใน `config.toml` |
+| กดปุ่มลัดแล้วเงียบ | ดูว่ามีไอคอนที่ tray ไหม ถ้าไม่มีให้เปิด `dev\run.bat` / ลองเปลี่ยนปุ่มใน `config.toml` |
 | F9 ไปแทนที่ผิดที่ | ต้องคลิกให้เคอร์เซอร์กะพริบในช่องพิมพ์ก่อน แล้วอย่าคลิกที่อื่นระหว่างรอ |
 | แปลช้ามาก | เปลี่ยน `[modes]` เป็น `haiku` หรือใส่ Gemini แล้วตั้ง `provider_order = ["gemini", "claude_code"]` |
-| `run_hotkey.bat` เปิดแล้วหายไปเฉยๆ | เปิด `data\hotkey.log` ดูบรรทัดท้ายๆ แล้วส่งให้ผมดู |
+| `dev\run.bat` เปิดแล้วหายไปเฉยๆ | เปิด `data\hotkey.log` ดูบรรทัดท้ายๆ แล้วส่งให้ผมดู |
 | Discord app ขึ้น LoginFailure | token ผิด ทำข้อ 4.3 ใหม่ (Reset Token แล้ววางใหม่ทั้งบรรทัด) |
 | คำสั่ง / ไม่ขึ้นใน Discord | เช็กว่าเลือก "Add to My Apps" ในข้อ 4.4 แล้วกด Ctrl+R ใน Discord |
-| ย้ายโฟลเดอร์แล้วเปิดไม่ได้ | ลบโฟลเดอร์ `.venv` แล้วดับเบิลคลิก `setup.bat` |
+| ย้ายโฟลเดอร์แล้วเปิดไม่ได้ | ลบโฟลเดอร์ `.venv` แล้วดับเบิลคลิก `dev\setup.bat` |

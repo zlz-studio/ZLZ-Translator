@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """สเปก PyInstaller: อบโปรแกรม + Python + ไลบรารีเป็นโฟลเดอร์ dist/ZLZ Translator/ (ผู้ใช้ไม่ต้องลง Python)
 
-    .venv\\Scripts\\python.exe -m PyInstaller --noconfirm --clean --workpath build\\pyi --distpath dist zlz_translator.spec
+    .venv\\Scripts\\python.exe -m PyInstaller --noconfirm --clean --workpath dev\\pyi --distpath dev\\dist dev\\zlz_translator.spec
 
 ไฟล์ค่าเริ่มต้น (config.toml, glossary.md, .env.example) ถูกฝังไปด้วย ตอนเปิดครั้งแรกโปรแกรมจะก๊อปไป
 %APPDATA%\\ZLZ Translator ให้ (ดู core/config.py: ensure_user_files)
@@ -10,12 +10,12 @@ import os
 
 from PyInstaller.utils.hooks import collect_submodules
 
-ROOT = os.path.abspath(".")
+ROOT = os.path.dirname(SPECPATH)  # โฟลเดอร์โปรเจกต์ (ไฟล์ spec อยู่ใน dev/)
 
 datas = [
-    ("config.toml", "."),
-    ("glossary.md", "."),
-    (".env.example", "."),
+    (os.path.join(ROOT, "config.toml"), "."),
+    (os.path.join(ROOT, "glossary.md"), "."),
+    (os.path.join(ROOT, ".env.example"), "."),
 ]
 
 hiddenimports = (
@@ -24,7 +24,7 @@ hiddenimports = (
 )
 
 a = Analysis(
-    ["zlz_translator.py"],
+    [os.path.join(SPECPATH, "zlz_translator.py")],
     pathex=[ROOT],
     binaries=[],
     datas=datas,
@@ -42,7 +42,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="ZLZ Translator",
-    icon="assets/icon.ico",
+    icon=os.path.join(ROOT, "assets", "icon.ico"),
     console=False,  # ไม่มีหน้าต่างดำ ไปอยู่ system tray
     disable_windowed_traceback=False,
     uac_admin=False,

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 APP_NAME = "ZLZ Translator"
-APP_VERSION = "1.0.0"  # build.bat และตัวติดตั้งอ่านค่านี้
+APP_VERSION = "1.0.0"  # dev\build.bat และตัวติดตั้งอ่านค่านี้
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 

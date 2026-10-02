@@ -1,7 +1,7 @@
 .venv/
 .env
 data/
-dist/
-build/pyi/
+dev/dist/
+dev/pyi/
 __pycache__/
 *.pyc

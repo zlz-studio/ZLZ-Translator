@@ -1,7 +1,7 @@
 # ZLZ Translator
 
 Repo: https://github.com/zlz-studio/ZLZ-Translator
-มือใหม่เริ่มที่ **[FRIEND_GUIDE.md](FRIEND_GUIDE.md)** (ติดตั้งใน 5 นาที ใช้แค่บัญชี Gmail)
+มือใหม่เริ่มที่ **[docs/FRIEND_GUIDE.md](docs/FRIEND_GUIDE.md)** (ติดตั้งใน 5 นาที ใช้แค่บัญชี Gmail)
 
 ## ติดตั้ง (แบบง่าย ไม่ต้องลง Python)
 
@@ -34,17 +34,28 @@ Repo: https://github.com/zlz-studio/ZLZ-Translator
 
 > ส่งให้คนอื่นใช้: ส่งลิงก์หน้า [Releases](https://github.com/zlz-studio/ZLZ-Translator/releases) ให้โหลด Setup.exe (ไม่มีคีย์ของคุณติดไปแน่นอน เพราะคีย์อยู่ใน `%APPDATA%` ไม่ได้อยู่ในตัวโปรแกรม)
 
-> ขั้นตอนแบบละเอียดทีละคลิก อยู่ใน **[SETUP_GUIDE.md](SETUP_GUIDE.md)**
+> ขั้นตอนแบบละเอียดทีละคลิก อยู่ใน **[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)**
 
 ## สร้างตัวติดตั้งเอง (สำหรับผู้พัฒนา)
 
-- **ในเครื่อง**: ดับเบิลคลิก `build.bat` (ต้องมี `.venv` จาก `setup.bat` และ [Inno Setup 6](https://jrsoftware.org/isinfo.php) — ลงด้วย `winget install JRSoftware.InnoSetup`) ได้ `dist\ZLZ-Translator-Setup-<เวอร์ชัน>.exe`
-- **อัตโนมัติบน GitHub**: แก้ `APP_VERSION` ใน `core/config.py` แล้ว `git tag v1.0.1 && git push origin v1.0.1` → GitHub Actions (`.github/workflows/release.yml`) จะ build และแนบ Setup.exe ขึ้นหน้า Releases ให้เอง
-- ส่วนประกอบ: `zlz_translator.py` (จุดเข้าโปรแกรม), `zlz_translator.spec` (PyInstaller), `installer/ZLZ-Translator.iss` (Inno Setup), `build/make_icon.py` (ไอคอน)
+- **ในเครื่อง**: ดับเบิลคลิก `dev\build.bat` (ต้องมี `.venv` จาก `dev\setup.bat` และ [Inno Setup 6](https://jrsoftware.org/isinfo.php) ลงด้วย `winget install JRSoftware.InnoSetup`) ได้ `dev\dist\ZLZ-Translator-Setup-<เวอร์ชัน>.exe`
+- **อัตโนมัติบน GitHub**: แก้ `APP_VERSION` ใน `core/config.py` แล้ว `git tag v1.0.1 && git push origin v1.0.1` จากนั้น GitHub Actions (`.github/workflows/release.yml`) จะ build และแนบ Setup.exe ขึ้นหน้า Releases ให้เอง
+
+## โครงสร้างโฟลเดอร์
+
+| ที่ | คืออะไร |
+|---|---|
+| `core/` `hotkey/` `discord_app/` | ซอร์สโค้ดของโปรแกรม |
+| `assets/` | ไอคอน (สร้างจาก `dev\make_icon.py`) |
+| `config.toml` `glossary.md` `.env.example` | ค่าเริ่มต้นที่ตัวติดตั้งก๊อปไปให้ผู้ใช้ และเป็นค่าที่ใช้ตอนรันจากซอร์ส |
+| `docs/` | คู่มือ: `FRIEND_GUIDE.md` (ผู้ใช้ทั่วไป), `SETUP_GUIDE.md` (ละเอียดทีละคลิก) |
+| `dev/` | ของนักพัฒนาเท่านั้น: `setup.bat` (สร้าง .venv), `run.bat` (รันจากซอร์ส), `build.bat` (สร้าง Setup.exe), `update.bat` (git pull), `zlz_translator.py` (จุดเข้าโปรแกรม), `zlz_translator.spec` (PyInstaller), `installer/` (Inno Setup), `tests/` |
+
+ผู้ใช้ทั่วไปไม่ต้องแตะอะไรในนี้เลย โหลด Setup.exe จากหน้า Releases อย่างเดียว
 
 ## ติดตั้งจากซอร์สโค้ด (สำหรับผู้พัฒนา ทำครั้งเดียว)
 
-**1. ติดตั้งไลบรารี** ดับเบิลคลิก `setup.bat` (ต้องมี Python 3.11 ขึ้นไป ถ้ายังไม่มีโหลดจาก python.org แล้วติ๊ก "Add to PATH")
+**1. ติดตั้งไลบรารี** ดับเบิลคลิก `dev\setup.bat` (ต้องมี Python 3.11 ขึ้นไป ถ้ายังไม่มีโหลดจาก python.org แล้วติ๊ก "Add to PATH")
 
 **2. ล็อกอิน Claude Code หนึ่งครั้ง** เลือกทางใดทางหนึ่ง
 
@@ -76,8 +87,10 @@ Repo: https://github.com/zlz-studio/ZLZ-Translator
 
 ## ใช้งานประจำวัน
 
-ดับเบิลคลิก `run_hotkey.bat` โปรแกรมจะไปอยู่ที่ system tray แล้วใช้ปุ่มลัดได้ทันทีในทุกแอป
-ถ้าอยากให้เปิดเองตอนเข้า Windows: กด Win+R พิมพ์ `shell:startup` แล้วสร้าง shortcut ของ `run_hotkey.bat` ไว้ในนั้น
+ติดตั้งจาก Setup.exe: ดับเบิลคลิกไอคอน **ZLZ Translator** บน Desktop หรือ Start Menu
+รันจากซอร์ส: ดับเบิลคลิก `dev\run.bat`
+ทั้งสองแบบโปรแกรมจะไปอยู่ที่ system tray แล้วใช้ปุ่มลัดได้ทันทีในทุกแอป
+ถ้าอยากให้เปิดเองตอนเข้า Windows: คลิกขวาไอคอน tray ติ๊ก **เปิดอัตโนมัติเมื่อเข้า Windows**
 
 ## ปรับแต่ง
 
@@ -138,7 +151,7 @@ Repo: https://github.com/zlz-studio/ZLZ-Translator
    - กด Save Changes แล้วก๊อปลิงก์ Install Link เก็บไว้
 3. เมนูซ้าย **Bot** กด **Reset Token** ก๊อป token มาใส่ในไฟล์ `.env` บรรทัด `DISCORD_TOKEN=...` (token เป็นความลับ ห้ามแชร์)
 4. เปิดลิงก์ Install Link ในเบราว์เซอร์ เลือก **Add to My Apps** แล้ว Authorize
-5. ดับเบิลคลิก `run_hotkey.bat` โปรแกรม Hotkey จะเปิด Discord app ให้เองเมื่อพบ DISCORD_TOKEN (เปิด/ปิดได้ที่เมนูไอคอน tray) ไม่มีหน้าต่างค้าง
+5. เปิดโปรแกรม (ไอคอน ZLZ Translator หรือ `dev\run.bat`) โปรแกรม Hotkey จะเปิด Discord app ให้เองเมื่อพบ DISCORD_TOKEN (เปิด/ปิดได้ที่เมนูไอคอน tray) ไม่มีหน้าต่างค้าง
 6. ใน Discord ลองพิมพ์ `/en` ถ้ายังไม่ขึ้น กด Ctrl+R ใน Discord เพื่อรีโหลด
 
-`run_discord.bat` มีไว้เฉพาะกรณีอยากรัน Discord app เดี่ยวๆ พร้อมดู log ในหน้าต่าง
+`dev\run_discord.bat` มีไว้เฉพาะกรณีอยากรัน Discord app เดี่ยวๆ พร้อมดู log ในหน้าต่าง

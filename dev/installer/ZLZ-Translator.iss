@@ -1,5 +1,5 @@
-; สคริปต์ Inno Setup: ห่อ dist\ZLZ Translator\ เป็น Setup.exe ติดตั้งแบบต่อผู้ใช้ (ไม่ต้อง Admin)
-; build.bat เรียกให้เอง:  ISCC.exe /DMyAppVersion=1.0.0 installer\ZLZ-Translator.iss
+; สคริปต์ Inno Setup: ห่อ dev\dist\ZLZ Translator\ เป็น Setup.exe ติดตั้งแบบต่อผู้ใช้ (ไม่ต้อง Admin)
+; dev\build.bat เรียกให้เอง:  ISCC.exe /DMyAppVersion=1.0.0 dev\installer\ZLZ-Translator.iss  (พาธด้านล่างเทียบกับไฟล์นี้)
 
 #ifndef MyAppVersion
   #define MyAppVersion "1.0.0"
@@ -25,7 +25,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\dist
 OutputBaseFilename=ZLZ-Translator-Setup-{#MyAppVersion}
-SetupIconFile=..\assets\icon.ico
+SetupIconFile=..\..\assets\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 Compression=lzma2

@@ -59,7 +59,7 @@ class SettingsDialog:
 
         # ---------- Discord ----------
         self._section(body, "2. Discord app (ทางเลือก: คลิกขวาแปลในตัว Discord และใช้บนมือถือ)", font, top=14)
-        tk.Label(body, text="สร้างแอปที่ Developer Portal > Installation ติ๊ก User Install > Bot กด Reset Token แล้วก๊อปมาวาง (ดู SETUP_GUIDE.md ขั้นที่ 4)",
+        tk.Label(body, text="สร้างแอปที่ Developer Portal > Installation ติ๊ก User Install > Bot กด Reset Token แล้วก๊อปมาวาง (ดู docs/SETUP_GUIDE.md ขั้นที่ 4)",
                  bg=BG, fg=MUTED, font=small, justify="left", wraplength=520).pack(anchor="w")
         self._link_button(body, "เปิด Discord Developer Portal", DISCORD_URL).pack(anchor="w", pady=(4, 6))
         self.discord_var = tk.StringVar(value=cfg.env.get("DISCORD_TOKEN", ""))

@@ -1,6 +1,6 @@
 """ทดสอบแกนแปลโดยไม่ต้องล็อกอินหรือมีคีย์จริง (ใช้ตัวปลอมของ claude)
 
-    .venv\\Scripts\\python.exe tests\\test_core.py
+    .venv\\Scripts\\python.exe dev\\tests\\test_core.py
 """
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]  # dev/tests/ -> โปรเจกต์
 sys.path.insert(0, str(ROOT))
-os.environ["CLAUDE_CODE_COMMAND"] = f"{sys.executable} {ROOT / 'tests' / 'fake_claude.py'}"
+os.environ["CLAUDE_CODE_COMMAND"] = f"{sys.executable} {Path(__file__).resolve().parent / 'fake_claude.py'}"
 
 from core.config import load_config  # noqa: E402
 from core.prompts import build_system_prompt, build_user_prompt  # noqa: E402

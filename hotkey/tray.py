@@ -25,11 +25,18 @@ def _make_icon_image(color: tuple) -> Image.Image:
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     draw.rounded_rectangle((2, 2, size - 2, size - 2), radius=14, fill=color)
-    try:
-        font = ImageFont.truetype("segoeuib.ttf", 34)
-    except OSError:
-        font = ImageFont.load_default()
-    draw.text((size / 2, size / 2), "แปล" if font.size > 20 else "T", fill="white", font=font, anchor="mm")
+    # ดีไซน์เดียวกับ assets/icon.ico (dev/make_icon.py) แต่เปลี่ยนสีตามสถานะ  ต้องใช้ฟอนต์ที่มีตัวไทย
+    font = None
+    for name in ("LeelaUIb.ttf", "leelawdb.ttf", "tahomabd.ttf"):
+        try:
+            font = ImageFont.truetype(name, 40)
+            break
+        except OSError:
+            continue
+    if font is not None:
+        draw.text((size / 2, size / 2 + 1), "ก", fill="white", font=font, anchor="mm")
+    else:
+        draw.text((size / 2, size / 2), "T", fill="white", font=ImageFont.load_default(), anchor="mm")
     return img
 
 

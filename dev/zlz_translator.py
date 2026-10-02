@@ -1,8 +1,8 @@
 """จุดเข้าโปรแกรมเดียวสำหรับตัว .exe (PyInstaller) และรันจากซอร์ส
 
-    python zlz_translator.py                เปิดโปรแกรม hotkey (ไป system tray) ถ้ายังไม่เคยตั้งค่าจะเปิดตัวช่วยก่อน
-    python zlz_translator.py --setup        เปิดตัวช่วยตั้งค่าอย่างเดียว
-    python zlz_translator.py --discord-bot  รัน Discord user app (ตัว hotkey เรียกเองเป็นโปรเซสลูก)
+    python dev\\zlz_translator.py            เปิดโปรแกรม hotkey (ไป system tray) ถ้ายังไม่เคยตั้งค่าจะเปิดตัวช่วยก่อน
+    python dev\\zlz_translator.py --setup    เปิดตัวช่วยตั้งค่าอย่างเดียว
+    python dev\\zlz_translator.py --discord-bot  รัน Discord user app (ตัว hotkey เรียกเองเป็นโปรเซสลูก)
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import os
 import sys
 
 # ให้ import core/hotkey ได้ทั้งตอนรันจากซอร์สและตอนถูก PyInstaller อบเป็น .exe
-_ROOT = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ไฟล์นี้อยู่ใน dev/ โปรเจกต์คือชั้นบน
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 

@@ -44,22 +44,22 @@ jobs:
 
       - name: Build icon + standalone folder (PyInstaller)
         run: |
-          python build/make_icon.py
-          python -m PyInstaller --noconfirm --clean --workpath build/pyi --distpath dist zlz_translator.spec
+          python dev/make_icon.py
+          python -m PyInstaller --noconfirm --clean --workpath dev/pyi --distpath dev/dist dev/zlz_translator.spec
 
       - name: Build Setup.exe (Inno Setup)
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DMyAppVersion=${{ steps.ver.outputs.version }}" installer\ZLZ-Translator.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DMyAppVersion=${{ steps.ver.outputs.version }}" dev\installer\ZLZ-Translator.iss
 
       - name: Upload artifact (for manual runs)
         uses: actions/upload-artifact@v4
         with:
           name: ZLZ-Translator-Setup-${{ steps.ver.outputs.version }}
-          path: dist/ZLZ-Translator-Setup-*.exe
+          path: dev/dist/ZLZ-Translator-Setup-*.exe
 
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/ZLZ-Translator-Setup-*.exe
+          files: dev/dist/ZLZ-Translator-Setup-*.exe
           generate_release_notes: true

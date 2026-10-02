@@ -1,7 +1,8 @@
 @echo off
 chcp 65001 >nul
-cd /d "%~dp0"
-echo === Discord Translator: อัปเดตเป็นเวอร์ชันล่าสุด ===
+cd /d "%~dp0.."
+echo === ZLZ Translator: อัปเดตซอร์สเป็นเวอร์ชันล่าสุด (นักพัฒนา) ===
+echo ผู้ใช้ทั่วไป: โหลด Setup.exe ตัวใหม่จากหน้า Releases แล้วรันทับได้เลย
 echo.
 
 if exist ".git" (
@@ -21,13 +22,13 @@ if exist ".git" (
 )
 
 if not exist ".venv\Scripts\python.exe" (
-  echo ยังไม่เคยติดตั้ง  กำลังเรียก setup.bat...
-  call setup.bat
+  echo ยังไม่เคยติดตั้ง  กำลังเรียก dev\setup.bat...
+  call "dev\setup.bat"
   exit /b
 )
 echo กำลังอัปเดตไลบรารี...
 ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt
 
 echo.
-echo อัปเดตเสร็จแล้ว  ถ้าโปรแกรมเปิดอยู่ ให้คลิกขวาไอคอน tray เลือก "ออกจากโปรแกรม" แล้วเปิด run_hotkey.bat ใหม่
+echo อัปเดตเสร็จแล้ว  ถ้าโปรแกรมเปิดอยู่ ให้คลิกขวาไอคอน tray เลือก "ออกจากโปรแกรม" แล้วเปิด dev\run.bat ใหม่
 pause
