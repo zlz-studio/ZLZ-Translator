@@ -23,6 +23,7 @@ import webbrowser
 from typing import Callable
 
 from core.config import APP_NAME, MODES, load_config, set_config_value, set_env_value
+from hotkey import entry_keys
 from core.providers import ProviderError
 from core.providers.claude_code import ClaudeCodeProvider, find_claude_command
 from hotkey import autostart
@@ -344,6 +345,8 @@ class SetupWizard:
         self.gemini_entry = tk.Entry(row, textvariable=self.gemini_var, bg=PANEL, fg=FG, insertbackground=FG,
                                      font=("Consolas", 11), bd=0, show="•")
         self.gemini_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 8))
+        entry_keys.install(self.gemini_entry)  # Ctrl+V ใช้ได้แม้แป้นเป็นไทย + เมนูคลิกขวา
+        self._button(row, "วาง", lambda: entry_keys.paste(self.gemini_entry)).pack(side="left", padx=(0, 8))
         self._button(row, "ตรวจสอบ", self._verify_gemini).pack(side="left")
         self.gemini_var.trace_add("write", lambda *_: self._invalidate_gemini())
         self.show_key = tk.BooleanVar(value=False)
@@ -406,6 +409,8 @@ class SetupWizard:
         self.code_entry = tk.Entry(code_row, textvariable=self.code_var, bg=PANEL, fg=FG, insertbackground=FG,
                                    font=("Consolas", 10), bd=0, state="disabled")
         self.code_entry.pack(side="left", fill="x", expand=True, ipady=5, padx=(0, 8))
+        entry_keys.install(self.code_entry)
+        self._button(code_row, "วาง", lambda: entry_keys.paste(self.code_entry)).pack(side="left", padx=(0, 8))
         self.btn_code = self._button(code_row, "ส่งโค้ด", self._send_code, state="disabled")
         self.btn_code.pack(side="left")
         self.login_log = self._log_box(f, height=6)

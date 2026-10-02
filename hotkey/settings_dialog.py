@@ -12,6 +12,7 @@ from typing import Callable
 import keyboard
 
 from core.config import APP_NAME, MODES, set_config_value, set_env_value
+from hotkey import entry_keys
 from core.providers import ProviderError
 from hotkey.popup import ACCENT, BG, FG, MUTED, PANEL
 
@@ -84,8 +85,10 @@ class SettingsDialog:
             tk.Label(row, text=HOTKEY_LABELS[mode], bg=BG, fg=MUTED, font=small, width=24, anchor="w").pack(side="left")
             var = tk.StringVar(value=cfg.hotkey(mode) or "")
             self.hotkey_vars[mode] = var
-            tk.Entry(row, textvariable=var, bg=PANEL, fg=FG, insertbackground=FG, relief="flat",
-                     font=("Consolas", 10), width=18).pack(side="left", ipady=3)
+            hk_entry = tk.Entry(row, textvariable=var, bg=PANEL, fg=FG, insertbackground=FG, relief="flat",
+                                font=("Consolas", 10), width=18)
+            hk_entry.pack(side="left", ipady=3)
+            entry_keys.install(hk_entry)
             self._button(row, "กดปุ่ม", lambda m=mode: self._capture_hotkey(m)).pack(side="left", padx=(6, 0))
         self.only_discord_var = tk.BooleanVar(value=any("discord" in a.lower() for a in cfg.only_in_apps))
         tk.Checkbutton(body, text="ให้ปุ่มลัดทำงานเฉพาะตอนหน้าต่าง Discord เปิดอยู่ (กันชนกับ Unity / Visual Studio)",
@@ -121,6 +124,9 @@ class SettingsDialog:
         entry = tk.Entry(row, textvariable=var, show="•", bg=PANEL, fg=FG, insertbackground=FG, relief="flat",
                          font=("Consolas", 10), width=46)
         entry.pack(side="left", fill="x", expand=True, ipady=4)
+        entry_keys.install(entry)  # Ctrl+V ใช้ได้แม้แป้นเป็นไทย + เมนูคลิกขวา
+        tk.Button(row, text="วาง", bg=PANEL, fg=MUTED, bd=0, font=("Segoe UI", 8), padx=6,
+                  command=lambda e=entry: entry_keys.paste(e)).pack(side="left", padx=(4, 0))
         tk.Button(row, text="แสดง", bg=PANEL, fg=MUTED, bd=0, font=("Segoe UI", 8), padx=6,
                   command=lambda e=entry: e.configure(show="" if e.cget("show") else "•")).pack(side="left", padx=(4, 0))
 
