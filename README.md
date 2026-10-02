@@ -5,7 +5,7 @@ Repo: https://github.com/zlz-studio/ZLZ-Translator
 
 ## ติดตั้ง (แบบง่าย ไม่ต้องลง Python)
 
-1. โหลด **`ZLZ-Translator-Setup-x.y.z.exe`** จากหน้า [Releases](https://github.com/zlz-studio/ZLZ-Translator/releases) แล้วดับเบิลคลิก
+1. ดับเบิลคลิก **`ZLZ-Translator-Setup-x.y.z.exe`** (อยู่ใน root ของโฟลเดอร์นี้ หรือโหลดจากหน้า [Releases](https://github.com/zlz-studio/ZLZ-Translator/releases))
 2. กด Next จนเสร็จ (ติดตั้งในโฟลเดอร์ผู้ใช้ ไม่ต้องสิทธิ์ Admin ได้ไอคอนบน Desktop + Start Menu + ตัว Uninstall)
 3. เปิดโปรแกรมครั้งแรกจะเจอ **ตัวช่วยตั้งค่าทีละขั้น**: ตรวจ/ติดตั้ง Claude Code ให้ → ปุ่มพาไปขอคีย์ Gemini แล้วตรวจคีย์ให้ → ปุ่ม Login Claude → เสร็จ กด "ถัดไป" ไม่ได้จนกว่าแต่ละขั้นจะผ่านจริง
 4. โปรแกรมไปอยู่ที่ไอคอนมุมขวาล่างจอ กด **F8** / **F9** ได้เลย
